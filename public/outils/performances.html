@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Performances — Préparer son vol</title>
+
+<!-- iOS : ajout à l'écran d'accueil comme app plein écran -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="DR400 Perf">
+<meta name="theme-color" content="#002157">
+<style>
+  :root{
+    --bg-deep:#f4f5f7;
+    --bg-panel:#eef2f8;
+    --bg-card:#ffffff;
+    --line:#dfe3ea;
+    --amber:#002157;
+    --warn:#9a5b0a;
+    --amber-dim:#002157;
+    --text:#14213d;
+    --text-dim:#5f6b7d;
+    --green:#1d6b45;
+    --red:#c8102e;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
+    --sans: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: var(--bg-deep);
+    color:var(--text);
+    font-family:var(--sans);
+    padding:calc(28px + env(safe-area-inset-top)) 16px calc(60px + env(safe-area-inset-bottom));
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wrap{max-width:960px;margin:0 auto;}
+
+  /* header */
+  header{
+    display:flex; justify-content:space-between; align-items:flex-end;
+    border-bottom:1px solid var(--line); padding-bottom:16px; margin-bottom:22px;
+    flex-wrap:wrap; gap:10px;
+  }
+  .tail{
+    font-family:var(--mono); letter-spacing:.08em; color:var(--amber);
+    font-size:14px; border:1px solid var(--amber-dim); padding:4px 9px; border-radius:3px;
+  }
+  h1{font-size:24px; margin:4px 0 2px; font-weight:600; letter-spacing:.01em;}
+  .sub{color:var(--text-dim); font-size:14.5px;}
+
+  /* phase toggle */
+  .toggle{display:flex; gap:8px; margin-bottom:20px;}
+  .toggle button{
+    flex:1; padding:11px 14px; border-radius:6px; border:1px solid var(--line);
+    background:var(--bg-panel); color:var(--text-dim); font-size:15px; font-weight:600;
+    cursor:pointer; letter-spacing:.03em; font-family:var(--sans);
+    transition:all .15s ease;
+  }
+  .toggle button.active{
+    background:#002157; border-color:#002157; color:#ffffff;
+  }
+
+  .grid{display:grid; grid-template-columns:1.05fr 1fr; gap:16px;}
+  @media (max-width:720px){ .grid{grid-template-columns:1fr;} }
+
+  .card{
+    background:var(--bg-card); border:1px solid var(--line); border-radius:10px;
+    padding:18px 18px 20px; box-shadow:0 1px 2px rgba(5,28,75,.04);
+  }
+  .card h2{
+    font-size:13px; text-transform:uppercase; letter-spacing:.12em; color:var(--text-dim);
+    margin:0 0 14px; font-weight:600;
+  }
+
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block; font-size:14px; color:var(--text-dim); margin-bottom:5px;
+  }
+  .field input[type=number]{
+    width:100%; background:var(--bg-panel); border:1px solid var(--line); border-radius:5px;
+    padding:9px 10px; color:var(--text); font-family:var(--mono); font-size:16px;
+  }
+  .field input[type=number]:focus{outline:none; border-color:var(--amber-dim);}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+
+  .segbtns{display:flex; gap:8px;}
+  .segbtns button{
+    flex:1; padding:8px 6px; border-radius:5px; border:1px solid var(--line);
+    background:var(--bg-panel); color:var(--text-dim); font-size:14px; cursor:pointer;
+    font-family:var(--sans);
+  }
+  .segbtns button.active{border-color:#002157; color:#ffffff; background:#002157;}
+
+  .windcard{
+    display:flex; align-items:center; gap:16px; background:var(--bg-panel);
+    border:1px solid var(--line); border-radius:8px; padding:10px 14px; margin-top:2px;
+  }
+  .windreadout{flex:1;}
+  .wr-line{display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--line);}
+  .wr-line:last-child{border-bottom:none;}
+  .wr-label{font-size:13.5px; color:var(--text-dim);}
+  .wr-val{font-family:var(--mono); font-size:15.5px; font-weight:600; color:var(--text);}
+  .windlimit-msg{font-size:13.5px; margin-top:8px; font-weight:600; display:none;}
+  .windlimit-msg.show{display:block;}
+  #windArrowGroup{transform-origin:80px 80px; transition:transform .15s ease;}
+
+  .hint{font-size:13px; color:var(--text-dim); margin-top:6px; line-height:1.4;}
+  .warn{color:var(--warn); font-size:13.5px; margin-top:8px; display:none; line-height:1.4;}
+  .warn.show{display:block;}
+
+  /* results */
+  .stat-big{
+    display:flex; align-items:baseline; gap:8px; margin-bottom:2px;
+  }
+  .stat-big .num{font-family:var(--mono); font-size:40px; font-weight:600; color:var(--amber);}
+  .stat-big .unit{font-size:15px; color:var(--text-dim);}
+  .stat-label{font-size:13px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.1em; margin-bottom:2px;}
+  .stat-sub{font-size:15px; color:var(--text-dim); margin-bottom:16px;}
+
+  .divider{border-top:1px dashed var(--line); margin:16px 0;}
+
+  /* runway bar */
+  .runway-wrap{margin-top:6px;}
+  .runway-bar{
+    position:relative; height:34px; background:#051c4b; border:1px solid var(--line);
+    border-radius:4px; overflow:hidden;
+  }
+  .runway-bar .fill{
+    position:absolute; top:0; left:0; bottom:0;
+    background:repeating-linear-gradient(90deg, #ffffff 0 2px, transparent 2px 10px);
+    opacity:.85;
+  }
+  .runway-bar .needline{
+    position:absolute; top:0; bottom:0; width:3px; background:#e4002b;
+  }
+  .runway-bar .label-avail{
+    position:absolute; right:8px; top:50%; transform:translateY(-50%);
+    font-family:var(--mono); font-size:13px; color:#ffffffcc;
+  }
+  .margin-line{display:flex; justify-content:space-between; margin-top:8px; font-size:14.5px;}
+  .margin-line .val{font-family:var(--mono); font-weight:600;}
+  .ok{color:var(--green);} .bad{color:var(--red);} .marg{color:var(--warn);}
+
+  footer{margin-top:26px; font-size:12.5px; color:var(--text-dim); line-height:1.6; border-top:1px solid var(--line); padding-top:14px;}
+  footer b{color:var(--text);}
+
+  /* aircraft selector */
+  .acselect{
+    width:100%; background:var(--bg-panel); border:1px solid var(--line); border-radius:6px;
+    padding:8px 10px; color:var(--text); font-family:var(--sans); font-size:15px; font-weight:600;
+    margin-bottom:6px; cursor:pointer;
+  }
+  .acselect:focus{outline:none; border-color:var(--amber-dim);}
+  .note-inactive{
+    font-size:12.5px; color:var(--warn); margin-top:6px; line-height:1.4; display:none;
+  }
+  .note-inactive.show{display:block;}
+  /* Intégration au site du club */
+  body{padding:16px 12px 32px;}
+  .card{border-radius:8px;}
+  .tail{border-radius:999px; background:#eef2f8; font-weight:700;}
+  h1{color:#002157; font-weight:700;}
+  .card h2{color:#002157;}
+  .toggle button, .segbtns button{border-radius:999px;}
+  header{border-bottom:3px solid #e4002b;}
+</style>
+<body>
+<div class="wrap">
+
+  <header>
+    <div style="width:100%;">
+      <select id="aircraftSelect" class="acselect" onchange="setAircraft(this.value)">
+        <option value="dr400">DR400/180 · F-HCLI</option>
+        <option value="ps28">PS28 Cruiser</option>
+        <option value="da40">DA40</option>
+        <option value="wt9">WT9 Dynamic</option>
+        <option value="b23">Bristell B23-915</option>
+      </select>
+      <h1>Calculateur de performances</h1>
+      <div class="sub" id="headerSub">Distances de décollage &amp; d'atterrissage — d'après le Manuel de Vol, Section 5</div>
+    </div>
+  </header>
+
+  <div class="toggle">
+    <button id="btn-deco" class="active" onclick="setPhase('deco')">DÉCOLLAGE</button>
+    <button id="btn-atter" onclick="setPhase('atter')">ATTERRISSAGE</button>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h2>Conditions</h2>
+
+      <div class="field">
+        <label id="lbl-masse">Masse (kg)</label>
+        <input type="number" id="masse" value="1100" max="1100" min="0" oninput="onMasseInput()">
+        <div class="note-inactive" id="noteMasseFixed">Masse fixe pour cet avion (pas d'interpolation de masse disponible dans le manuel).</div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Altitude terrain (ft)</label>
+          <input type="number" id="altiTerrain" value="0" step="10" oninput="calc()">
+        </div>
+        <div class="field">
+          <label>QNH du jour (hPa)</label>
+          <input type="number" id="qnh" value="1013" step="1" oninput="calc()">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Altitude pression calculée</label>
+        <input type="number" id="alti" value="0" readonly style="opacity:.8; cursor:default;">
+        <div class="hint">= altitude terrain + (1013 − QNH) × 30 ft/hPa</div>
+        <div class="note-inactive" id="noteAltiFixed">Le manuel de cet avion ne fournit pas de correction altitude/température — la distance affichée est une valeur de référence fixe (voir détail sous le résultat).</div>
+      </div>
+
+      <div class="field">
+        <label>Température OAT (°C)</label>
+        <input type="number" id="temp" value="15" oninput="calc()">
+      </div>
+
+      <div class="field">
+        <label>Orientation piste / QFU (°)</label>
+        <input type="number" id="qfu" value="230" min="0" max="360" oninput="calc()">
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Direction du vent (° d'où il vient)</label>
+          <input type="number" id="ventDir" value="230" min="0" max="360" oninput="calc()">
+        </div>
+        <div class="field">
+          <label>Force du vent (kt)</label>
+          <input type="number" id="ventForce" value="0" min="0" oninput="calc()">
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="windcard">
+          <svg viewBox="0 0 160 160" width="140" height="140">
+            <circle cx="80" cy="80" r="70" fill="none" stroke="#b7c2d3" stroke-width="1"/>
+            <line x1="80" y1="14" x2="80" y2="146" stroke="#b7c2d3" stroke-width="1" stroke-dasharray="3 4"/>
+            <line x1="14" y1="80" x2="146" y2="80" stroke="#b7c2d3" stroke-width="1" stroke-dasharray="3 4"/>
+            <rect x="73" y="20" width="14" height="120" rx="2" fill="#051c4b" stroke="#002157"/>
+            <text x="80" y="16" text-anchor="middle" font-size="9" fill="#5f6b7d" font-family="ui-monospace,monospace">NEZ</text>
+            <g id="windArrowGroup">
+              <line id="windLine" x1="80" y1="14" x2="80" y2="80" stroke="#e4002b" stroke-width="3" stroke-linecap="round"/>
+              <polygon id="windHead" points="74,84 86,84 80,96" fill="#e4002b"/>
+            </g>
+            <circle cx="80" cy="80" r="4" fill="#002157"/>
+          </svg>
+          <div class="windreadout">
+            <div class="wr-line"><span class="wr-label">Composante</span><span class="wr-val" id="wr-hw">—</span></div>
+            <div class="wr-line"><span class="wr-label">Traversier</span><span class="wr-val" id="wr-xw">—</span></div>
+            <div class="wr-line"><span class="wr-label" id="wr-xwlimit-label">Limite traversier démontrée</span><span class="wr-val" id="wr-xwlimit">22 kt</span></div>
+          </div>
+        </div>
+        <div class="windlimit-msg" id="windLimitMsg"></div>
+        <div class="hint" id="windHint">Traversier démontré : 22 kt (40 km/h) — valeur du manuel de vol (décollage et atterrissage).</div>
+        <div class="note-inactive" id="noteWindFixed">Le manuel de cet avion ne fournit pas de formule de correction de distance selon le vent — la distance affichée n'est pas ajustée (composantes indiquées à titre informatif).</div>
+      </div>
+
+      <div class="field">
+        <label>État de piste</label>
+        <div class="segbtns">
+          <button id="piste-dur" class="active" onclick="setPiste('dur')">Dur sec</button>
+          <button id="piste-herbe" onclick="setPiste('herbe')">Herbe sèche</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Longueur de piste disponible (m) — optionnel</label>
+        <input type="number" id="pisteLen" value="" placeholder="ex. 800" oninput="calc()">
+      </div>
+
+      <div class="warn" id="warnBox"></div>
+    </div>
+
+    <div class="card">
+      <h2 id="res-title">Résultat — Décollage</h2>
+
+      <div class="stat-label">Distance de roulement</div>
+      <div class="stat-big"><span class="num" id="roll-m">—</span><span class="unit">m</span></div>
+      <div class="stat-sub" id="roll-ft">—</div>
+
+      <div class="stat-label">Distance totale (passage 15 m / 50 ft)</div>
+      <div class="stat-big"><span class="num" id="d15-m">—</span><span class="unit">m</span></div>
+      <div class="stat-sub" id="d15-ft">—</div>
+
+      <div class="divider"></div>
+
+      <div class="stat-label" id="vlabel1">Vitesse de décollage</div>
+      <div class="stat-sub" id="vval1" style="font-size:15px;">—</div>
+      <div class="stat-label" id="vlabel2">Vitesse de passage 15 m</div>
+      <div class="stat-sub" id="vval2" style="font-size:15px;">—</div>
+
+      <div id="runwaySection" style="display:none;">
+        <div class="divider"></div>
+        <div class="stat-label">Marge / piste disponible</div>
+        <div class="runway-wrap">
+          <div class="runway-bar">
+            <div class="fill" id="rwFill"></div>
+            <div class="needline" id="rwNeed"></div>
+            <div class="label-avail" id="rwAvailLabel"></div>
+          </div>
+        </div>
+        <div class="margin-line">
+          <span>Marge restante</span>
+          <span class="val" id="rwMargin">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer id="footerText">
+  </footer>
+</div>
+
+<script>
+// =====================================================================
+// REGISTRE AVIONS
+// =====================================================================
+const AIRCRAFT = {
+
+  dr400: {
+    label: 'DR400/180', tail: 'F-HCLI', mode: 'grid',
+    deco: {
+      massHigh: 1100, massLow: 900,
+      altitudes: [0, 2500, 5000, 8000], devPoints: [-20, 0, 20],
+      table: {
+        0:    { rollHigh:[215,250,290], d15High:[445,515,600], rollLow:[120,140,165], d15Low:[250,290,340] },
+        2500: { rollHigh:[260,305,355], d15High:[540,635,735], rollLow:[150,175,200], d15Low:[310,360,415] },
+        5000: { rollHigh:[330,385,445], d15High:[680,795,925], rollLow:[185,215,250], d15Low:[385,450,520] },
+        8000: { rollHigh:[430,505,590], d15High:[890,1050,1225], rollLow:[245,285,335], d15Low:[505,590,695] }
+      }
+    },
+    atter: {
+      massHigh: 1045, massLow: 845,
+      altitudes: [0, 4000, 8000], devPoints: [-20, 0, 20],
+      table: {
+        0:    { rollHigh:[230,250,270], d15High:[500,530,560], rollLow:[190,200,215], d15Low:[425,450,475] },
+        4000: { rollHigh:[260,280,300], d15High:[550,585,620], rollLow:[210,230,240], d15Low:[465,495,520] },
+        8000: { rollHigh:[295,320,340], d15High:[610,650,690], rollLow:[240,260,275], d15Low:[510,545,575] }
+      }
+    },
+    windFace: [[0,1.0],[10,0.85],[20,0.65],[30,0.55]],
+    tailwind: { stepKt:2, pct:10 },
+    grass: { mode:'pct', pct:15 },
+    crosswind: { deco:22, atter:22 },
+    speeds: {
+      deco:  { l1:'Vitesse de décollage', v1:'100 km/h (54 kt)', l2:'Vitesse de passage 15 m', v2:'130 km/h (70 kt)' },
+      atter: { l1:'Vitesse de passage 15 m', v1:'125 km/h (68 kt)', l2:"Vitesse d'impact", v2:'95 km/h (51 kt)' }
+    },
+    dataNote: "Manuel de Vol DR400/180 F-HCLI, Section 5 — Performances (masse maxi décollage 1100 kg / masse maxi atterrissage 1045 kg, volets 1<sup>er</sup> cran au décollage, 2<sup>e</sup> cran à l'atterrissage, piste en dur sèche et plane). Les valeurs intermédiaires (masse, altitude, température, vent) sont obtenues par <b>interpolation linéaire</b> entre les points du tableau du manuel."
+  },
+
+  wt9: {
+    label: 'WT9 Dynamic', tail: '', mode: 'grid',
+    deco: {
+      massHigh: 600, massLow: 600,
+      altitudes: [0,2000,4000,6000,8000,10000], devPoints:[-30,-20,-10,0,10,20,30],
+      table: {
+        0:     { rollHigh:[109,118,127,136,146,156,166], d15High:[211,228,245,263,282,301,321], rollHighGrass:[123,132,143,153,164,175,187], d15HighGrass:[229,247,266,285,305,326,347] },
+        2000:  { rollHigh:[122,132,142,153,164,175,187], d15High:[237,256,275,296,317,339,362], rollHighGrass:[138,149,160,172,184,197,210], d15HighGrass:[257,277,298,321,344,367,392] },
+        4000:  { rollHigh:[138,149,160,172,185,198,211], d15High:[266,288,310,334,358,383,409], rollHighGrass:[155,167,180,194,208,223,238], d15HighGrass:[288,312,336,361,388,415,443] },
+        6000:  { rollHigh:[155,167,181,195,209,224,239], d15High:[299,324,350,376,404,433,463], rollHighGrass:[174,188,203,219,235,252,269], d15HighGrass:[324,351,379,408,438,469,501] },
+        8000:  { rollHigh:[174,189,204,220,236,253,271], d15High:[337,365,395,425,457,490,524], rollHighGrass:[196,212,230,247,266,285,305], d15HighGrass:[365,396,428,461,495,531,568] },
+        10000: { rollHigh:[197,213,231,249,268,288,308], d15High:[380,413,447,482,519,557,596], rollHighGrass:[221,240,260,280,302,324,347], d15HighGrass:[412,447,484,522,562,603,646] }
+      }
+    },
+    atter: {
+      massHigh: 600, massLow: 600,
+      altitudes: [0,2000,4000,6000,8000,10000], devPoints:[-30,-20,-10,0,10,20,30],
+      table: {
+        0:     { d15High:[332,359,386,414,443,473,505], rollHigh:[99,107,115,123,132,141,150], d15HighGrass:[421,454,488,524,561,599,639], rollHighGrass:[185,199,214,230,246,263,280] },
+        2000:  { d15High:[373,403,434,466,499,534,569], rollHigh:[111,120,129,138,148,159,169], d15HighGrass:[472,509,549,590,632,675,721], rollHighGrass:[207,224,241,259,277,296,316] },
+        4000:  { d15High:[419,453,488,525,563,603,643], rollHigh:[124,135,145,156,167,179,191], d15HighGrass:[530,573,618,665,713,763,814], rollHighGrass:[233,252,271,292,313,335,357] },
+        6000:  { d15High:[471,510,550,593,636,681,728], rollHigh:[140,151,164,176,189,202,216], d15HighGrass:[596,645,697,750,805,862,922], rollHighGrass:[262,283,306,329,353,379,405] },
+        8000:  { d15High:[530,575,621,670,720,772,825], rollHigh:[158,171,185,199,214,229,245], d15HighGrass:[671,728,787,848,911,977,1045], rollHighGrass:[295,319,345,372,400,429,459] },
+        10000: { d15High:[599,650,703,759,816,876,938], rollHigh:[178,193,209,225,243,260,279], d15HighGrass:[758,823,890,960,1033,1109,1187], rollHighGrass:[333,361,391,422,454,487,521] }
+      }
+    },
+    windFace: null,
+    tailwind: { stepKt:1, pct:5, capKt:10 },
+    grass: { mode:'direct' },
+    crosswind: { deco:15, atter:15 },
+    speeds: {
+      deco:  { l1:'Vitesse de décollage (Vlof)', v1:'80 km/h (43 kt)', l2:'Vitesse de passage 50 ft (V50)', v2:'100 km/h (54 kt)' },
+      atter: { l1:'Vitesse de décrochage (Vso)', v1:'61 km/h (33 kt)', l2:'', v2:'' }
+    },
+    dataNote: "Manuel de Vol WT9 Dynamic, Section 5 — masse fixe 600 kg (décollage et atterrissage). Correction vent : uniquement une pénalité vent arrière (+5 % par kt jusqu'à 10 kt) — <b>le manuel ne fournit aucune réduction de distance pour le vent de face</b>, elle n'est donc pas appliquée ici. Traversier démontré : 15 kt (décollage et atterrissage)."
+  },
+
+  ps28: {
+    label: 'PS28 Cruiser', tail: '', mode: 'fixed',
+    deco:  { mass:600, paved:{roll:141,d15:387}, grass:{roll:214,d15:457} },
+    atter: { mass:600, paved:{roll:146,d15:362}, grass:{roll:111,d15:338} },
+    crosswind: { deco:12, atter:12 },
+    maxHeadwind: 24,
+    speeds: {
+      deco:  { l1:'Vitesse de rotation', v1:'40 – 44 kt', l2:'Vitesse de montée (Vy)', v2:'62 kt' },
+      atter: { l1:"Vitesse d'approche", v1:'60 kt', l2:'Vso', v2:'31 kt' }
+    },
+    dataNote: "Manuel de Vol PS28 Cruiser, Section 5 — masse fixe 600 kg. <b>Valeurs de référence uniques</b> : altitude 0 ft, conditions ISA, vent nul — le manuel ne fournit ni tableau altitude/température, ni formule de correction vent. Les distances affichées ne varient donc pas avec l'altitude, la température ou le vent saisis (affichés à titre informatif uniquement). Vent de face max. démontré : 24 kt. Vent traversier démontré : 12 kt."
+  },
+
+  da40: {
+    label: 'DA40', tail: '', mode: 'fixed',
+    deco:  { mass:1200, paved:{roll:170,d15:300}, grassRollPct:10,
+             conditionNote:"Exemple du manuel (graphique, pas de tableau chiffré) : 0 ft pression, 15°C, masse 1000 kg, vent de face 10 kt déjà intégré — pas la configuration MTOW/vent nul." },
+    atter: { mass:1150, paved:{roll:352,d15:638}, grassRollPct:5,
+             conditionNote:"Valeurs à la masse max. atterrissage (MLW) 1150 kg, ISA, niveau de la mer, vent nul, volets atterrissage." },
+    crosswind: { deco:20, atter:20 },
+    speeds: {
+      deco:  { l1:'Vitesse de décollage (VLOF)', v1:'≈ 59 KIAS', l2:'Vitesse de montée initiale', v2:'67 KIAS (à 1200 kg)' },
+      atter: { l1:"Vitesse d'approche", v1:'71 KIAS (à 1150 kg)', l2:'Vso (approx.)', v2:'49 KIAS' }
+    },
+    dataNote: "Manuel de Vol DA40 (AFM), Section 5. MTOW 1200 kg / MLW 1150 kg. <b>La distance de décollage n'est présentée dans le manuel que sous forme d'abaque graphique</b> (pas de tableau chiffré) : la valeur affichée est l'exemple annoté du manuel, dans des conditions particulières (voir détail sous le résultat), pas au MTOW ni vent nul. La distance d'atterrissage est une valeur de référence unique à la masse max. atterrissage, ISA, vent nul. Aucune formule de correction altitude/température/vent n'est disponible pour cet avion — la correction herbe (+10 % décollage / +5 % atterrissage, piste courte sèche) s'applique uniquement au roulement, pas à la distance 15 m, conformément au manuel."
+  },
+
+  b23: {
+    label: 'Bristell B23-915', tail: '',
+    deco: {
+      massHigh: 750, massLow: 750,
+      altitudes: [0,2000,4000,6000], devPoints: [-20,-10,0,10,20],
+      table: {
+        0:    { rollHigh:[149,162,176,191,208], d15High:[272,301,331,363,397] },
+        2000: { rollHigh:[174,191,208,229,252], d15High:[321,352,385,421,460] },
+        4000: { rollHigh:[208,230,254,282,314], d15High:[376,411,450,493,540] },
+        6000: { rollHigh:[253,283,319,360,411], d15High:[441,484,532,588,653] }
+      },
+      windLinear: { headwindPctPer5:-15, tailwindPctPer5:20 },
+      grassFactor: 1.14,
+      correctionsD15Only: true
+    },
+    atter: {
+      mass:750, paved:{roll:146,d15:391},
+      windLinear: { headwindPctPer5:-5, tailwindPctPer5:10 },
+      grassFactor: 1.18,
+      correctionsD15Only: true,
+      conditionNote: "Valeur de référence unique du manuel (MTOW/MLW 750 kg, ISA, niveau de la mer, vent nul) — contrairement au décollage, le manuel ne fournit pas de tableau altitude/température pour l'atterrissage. Les corrections vent et herbe ci-dessous restent appliquées."
+    },
+    crosswind: { deco:15, atter:15 },
+    speeds: {
+      deco:  { l1:'Vitesse de décollage', v1:'60 KIAS', l2:'Vitesse de passage 50 ft', v2:'70 KIAS' },
+      atter: { l1:"Vitesse d'approche finale", v1:'58 KIAS', l2:'Vso', v2:'44 KIAS' }
+    },
+    dataNote: "Manuel de Vol BRISTELL B23-915 (ADXC-73-003-AFM), Section 5. Masse fixe 750 kg (décollage et atterrissage). <b>Décollage</b> : tableau complet altitude (0–6000 ft) × température (ISA ±20 °C), interpolation linéaire ; correction vent −15 %/+20 % par tranche de 5 kt (face/arrière), herbe ×1,14 — appliquées uniquement à la distance 15 m/50 ft, pas au roulement, conformément au manuel. <b>Atterrissage</b> : valeur de référence unique (pas de tableau altitude/température dans le manuel), corrections vent −5 %/+10 % par 5 kt et herbe ×1,18, également appliquées à la distance 15 m/50 ft uniquement. Vent traversier démontré : 15 kt. Les corrections de pente de piste données par le manuel (montée/descente) ne sont pas intégrées ici (pas de champ prévu pour la pente)."
+  }
+};
+
+let currentAircraft = 'dr400';
+let phase = 'deco';
+let piste = 'dur';
+const masseParCombo = {}; // clé "aircraft:phase" -> masse saisie
+
+// =====================================================================
+// UTILITAIRES
+// =====================================================================
+function isaTemp(altFt){ return 15 - 1.98 * (altFt/1000); }
+function lerp(x0,x1,y0,y1,x){ if (x1===x0) return y0; return y0 + (y1-y0) * (x-x0)/(x1-x0); }
+function fmt(n){ return Math.round(n); }
+function toFt(m){ return Math.round(m*3.28084); }
+
+// interpolation générique sur un tableau de points (dev, valeur), any length >=2
+function interpGeneric(devPoints, vals, dev){
+  const n = devPoints.length;
+  if (dev <= devPoints[0]) return lerp(devPoints[0],devPoints[1],vals[0],vals[1],dev);
+  if (dev >= devPoints[n-1]) return lerp(devPoints[n-2],devPoints[n-1],vals[n-2],vals[n-1],dev);
+  for (let i=0;i<n-1;i++){
+    if (dev>=devPoints[i] && dev<=devPoints[i+1]) return lerp(devPoints[i],devPoints[i+1],vals[i],vals[i+1],dev);
+  }
+}
+
+function windFaceFactor(table, vent){
+  if (!table) return 1;
+  if (vent <= 0) return 1;
+  const pts = table;
+  if (vent <= pts[pts.length-1][0]){
+    for (let i=0;i<pts.length-1;i++){
+      if (vent>=pts[i][0] && vent<=pts[i+1][0]) return lerp(pts[i][0],pts[i+1][0],pts[i][1],pts[i+1][1],vent);
+    }
+  }
+  const a=pts[pts.length-2], b=pts[pts.length-1];
+  const slope=(b[1]-a[1])/(b[0]-a[0]);
+  return b[1] + slope*(vent-b[0]);
+}
+
+function tailwindFactor(rule, tailwindKt){
+  if (!rule || tailwindKt<=0) return 1;
+  const capped = rule.capKt ? Math.min(tailwindKt, rule.capKt) : tailwindKt;
+  const steps = Math.ceil(capped/rule.stepKt);
+  return 1 + (rule.pct/100)*steps;
+}
+
+// modèle linéaire alternatif (B23) : X% par tranche de N kt, continu (pas de palier)
+function windLinearFactor(rule, ventKt){
+  if (!rule) return null;
+  if (ventKt >= 0) return 1 + (rule.headwindPctPer5/100) * (ventKt/5);
+  return 1 + (rule.tailwindPctPer5/100) * (-ventKt/5);
+}
+
+function windAngleRelative(ventDir, qfu){
+  let a = ((ventDir - qfu) % 360 + 360) % 360;
+  if (a > 180) a -= 360;
+  return a;
+}
+function windComponents(ventDir, ventForce, qfu){
+  const angle = windAngleRelative(ventDir, qfu);
+  const rad = angle * Math.PI/180;
+  return { angle, headwind: ventForce*Math.cos(rad), crosswind: ventForce*Math.sin(rad) };
+}
+function updateWindArrow(angle){
+  document.getElementById('windArrowGroup').setAttribute('transform','rotate('+angle+' 80 80)');
+}
+
+// =====================================================================
+// CALCUL DES DISTANCES — MODE "grid" (DR400 / WT9)
+// =====================================================================
+function computeGrid(ac, phaseData, masse, altFt, tempC, ventKt){
+  const dev = tempC - isaTemp(altFt);
+  const warnings = [];
+  if (dev < phaseData.devPoints[0] || dev > phaseData.devPoints[phaseData.devPoints.length-1])
+    warnings.push("Température hors plage du tableau — valeur extrapolée.");
+
+  const alts = phaseData.altitudes;
+  if (altFt < alts[0] || altFt > alts[alts.length-1])
+    warnings.push("Altitude hors plage du tableau (" + alts[0] + "–" + alts[alts.length-1] + " ft) — valeur extrapolée.");
+
+  let iLow, iHigh;
+  if (altFt <= alts[0]){ iLow=0; iHigh=1; }
+  else if (altFt >= alts[alts.length-1]){ iLow=alts.length-2; iHigh=alts.length-1; }
+  else { for (let i=0;i<alts.length-1;i++){ if (altFt>=alts[i] && altFt<=alts[i+1]){ iLow=i; iHigh=i+1; break; } } }
+  const aLow = alts[iLow], aHigh = alts[iHigh];
+  const rowLow = phaseData.table[aLow], rowHigh = phaseData.table[aHigh];
+
+  const useGrass = (piste==='herbe' && ac.grass && ac.grass.mode==='direct');
+  const rollKeyH = useGrass ? 'rollHighGrass' : 'rollHigh';
+  const d15KeyH  = useGrass ? 'd15HighGrass'  : 'd15High';
+
+  function v(row,key){ return interpGeneric(phaseData.devPoints, row[key], dev); }
+
+  const rollAtLow  = v(rowLow, rollKeyH),  rollAtHigh = v(rowHigh, rollKeyH);
+  const d15AtLow   = v(rowLow, d15KeyH),   d15AtHigh  = v(rowHigh, d15KeyH);
+
+  let roll = lerp(aLow,aHigh, rollAtLow, rollAtHigh, altFt);
+  let d15  = lerp(aLow,aHigh, d15AtLow,  d15AtHigh,  altFt);
+
+  // interpolation masse (si deux masses différentes fournies)
+  if (phaseData.massHigh !== phaseData.massLow){
+    const rollLowKey = useGrass ? 'rollLowGrass' : 'rollLow';
+    const d15LowKey  = useGrass ? 'd15LowGrass'  : 'd15Low';
+    const rollLo_low = v(rowLow, rollLowKey), rollLo_high = v(rowHigh, rollLowKey);
+    const d15Lo_low  = v(rowLow, d15LowKey),  d15Lo_high  = v(rowHigh, d15LowKey);
+    const rollLo = lerp(aLow,aHigh, rollLo_low, rollLo_high, altFt);
+    const d15Lo  = lerp(aLow,aHigh, d15Lo_low,  d15Lo_high,  altFt);
+
+    if (masse > phaseData.massHigh) warnings.push("Masse supérieure à la masse maximale (" + phaseData.massHigh + " kg).");
+    if (masse < phaseData.massLow)  warnings.push("Masse inférieure au point bas du tableau (" + phaseData.massLow + " kg) — extrapolée.");
+    roll = lerp(phaseData.massLow, phaseData.massHigh, rollLo, roll, masse);
+    d15  = lerp(phaseData.massLow, phaseData.massHigh, d15Lo,  d15,  masse);
+  }
+
+  // vent : modèle linéaire (phase, ex. B23) prioritaire, sinon modèle par paliers (avion, DR400/WT9)
+  let windRoll, windD15;
+  const linear = windLinearFactor(phaseData.windLinear, ventKt);
+  if (linear !== null){
+    windRoll = linear; windD15 = linear;
+    if (ventKt < 0 && phaseData.windLinear.tailwindCapKt && -ventKt > phaseData.windLinear.tailwindCapKt)
+      warnings.push("Vent arrière au-delà de " + phaseData.windLinear.tailwindCapKt + " kt : valeur plafonnée.");
+  } else {
+    const wf = windFaceFactor(ac.windFace, ventKt);
+    const tf = tailwindFactor(ac.tailwind, ventKt<0 ? -ventKt : 0);
+    windRoll = (ventKt>=0 ? wf : tf); windD15 = windRoll;
+    if (ac.tailwind && ac.tailwind.capKt && ventKt<0 && -ventKt>ac.tailwind.capKt)
+      warnings.push("Vent arrière au-delà de " + ac.tailwind.capKt + " kt : le manuel ne donne pas de correction au-delà, valeur plafonnée à " + ac.tailwind.capKt + " kt.");
+  }
+
+  const d15Only = !!phaseData.correctionsD15Only;
+  d15 *= windD15;
+  if (!d15Only) roll *= windRoll;
+
+  // herbe : facteur direct par phase (B23), sinon % avion (DR400), sinon colonnes directes déjà gérées plus haut (WT9)
+  if (piste==='herbe'){
+    if (phaseData.grassFactor){
+      d15 *= phaseData.grassFactor;
+      if (!d15Only) roll *= phaseData.grassFactor;
+    } else if (ac.grass && ac.grass.mode==='pct'){
+      roll *= (1+ac.grass.pct/100); d15 *= (1+ac.grass.pct/100);
+    }
+  }
+
+  return { roll, d15, warnings };
+}
+
+// =====================================================================
+// CALCUL — MODE "fixed" (PS28 / DA40)
+// =====================================================================
+function computeFixed(ac, phaseData, ventKt){
+  let roll, d15;
+  const warnings = [];
+  const isGrass = (piste==='herbe');
+  if (phaseData.grass){ // PS28 : valeurs directes par surface
+    const src = isGrass ? phaseData.grass : phaseData.paved;
+    roll = src.roll; d15 = src.d15;
+  } else {
+    roll = phaseData.paved.roll; d15 = phaseData.paved.d15;
+    // DA40 : correction % roulement seul si herbe
+    if (isGrass && phaseData.grassRollPct) roll *= (1 + phaseData.grassRollPct/100);
+  }
+
+  // vent linéaire (B23) si défini pour cette phase
+  if (phaseData.windLinear && typeof ventKt === 'number'){
+    const linear = windLinearFactor(phaseData.windLinear, ventKt);
+    const d15Only = !!phaseData.correctionsD15Only;
+    d15 *= linear;
+    if (!d15Only) roll *= linear;
+  }
+  // herbe en facteur direct (B23), en plus du cas PS28/DA40 déjà traité ci-dessus
+  if (isGrass && phaseData.grassFactor){
+    const d15Only = !!phaseData.correctionsD15Only;
+    d15 *= phaseData.grassFactor;
+    if (!d15Only) roll *= phaseData.grassFactor;
+  }
+
+  return { roll, d15, warnings };
+}
+
+// =====================================================================
+// UI — SÉLECTION AVION / PHASE / PISTE
+// =====================================================================
+function setAircraft(id){
+  currentAircraft = id;
+  document.getElementById('aircraftSelect').value = id;
+  refreshPhaseUI();
+  calc();
+}
+
+function setPhase(p){
+  const el = document.getElementById('masse');
+  const curVal = parseFloat(el.value);
+  if (!isNaN(curVal)) masseParCombo[currentAircraft+':'+phase] = curVal;
+  phase = p;
+  document.getElementById('btn-deco').classList.toggle('active', p==='deco');
+  document.getElementById('btn-atter').classList.toggle('active', p==='atter');
+  refreshPhaseUI();
+  calc();
+}
+
+function refreshPhaseUI(){
+  const ac = AIRCRAFT[currentAircraft];
+  const pd = ac[phase];
+  const el = document.getElementById('masse');
+
+  document.getElementById('lbl-masse').textContent =
+    phase==='deco' ? 'Masse au décollage (kg)' : 'Masse à l\'atterrissage (kg)';
+  document.getElementById('res-title').textContent =
+    phase==='deco' ? 'Résultat — Décollage' : 'Résultat — Atterrissage';
+
+  const sp = ac.speeds[phase];
+  document.getElementById('vlabel1').textContent = sp.l1;
+  document.getElementById('vlabel2').textContent = sp.l2;
+
+  // masse : toujours éditable, plafonnée à la masse max du manuel pour cet avion/phase
+  const maxMasse = pd.altitudes ? pd.massHigh : pd.mass;
+  el.readOnly = false; el.style.opacity = 1;
+  el.max = maxMasse; el.min = 0;
+  el.value = masseParCombo[currentAircraft+':'+phase] || maxMasse;
+  document.getElementById('noteMasseFixed').classList.remove('show');
+
+  // notes "mode fixed" (pas de correction alti/temp/vent)
+  const isFixed = !pd.altitudes;
+  document.getElementById('noteAltiFixed').classList.toggle('show', isFixed);
+
+  const noteWindEl = document.getElementById('noteWindFixed');
+  if (pd.windLinear){
+    noteWindEl.classList.remove('show');
+  } else if (isFixed){
+    noteWindEl.textContent = "Le manuel de cet avion ne fournit pas de formule de correction de distance selon le vent — la distance affichée n'est pas ajustée (composantes indiquées à titre informatif).";
+    noteWindEl.classList.add('show');
+  } else if (ac.windFace === null){
+    noteWindEl.textContent = "Le manuel de cet avion ne fournit pas de bonus de distance pour le vent de face (seule la pénalité vent arrière ci-dessous est appliquée) — un vent de face n'aura donc aucun effet sur la distance affichée, contrairement au vent arrière.";
+    noteWindEl.classList.add('show');
+  } else {
+    noteWindEl.classList.remove('show');
+  }
+
+  // limite traversier (par avion, par phase)
+  const cw = ac.crosswind[phase];
+  document.getElementById('wr-xwlimit').textContent = (Number.isInteger(cw)?cw:cw.toFixed(1)) + ' kt';
+  let windHintTxt = 'Traversier démontré : ' + (Number.isInteger(cw)?cw:cw.toFixed(1)) + ' kt';
+  if (ac.maxHeadwind) windHintTxt += ' · Vent de face max. démontré : ' + ac.maxHeadwind + ' kt';
+  windHintTxt += ' — valeur du manuel de vol.';
+  document.getElementById('windHint').textContent = windHintTxt;
+
+  // en-tête
+  document.getElementById('headerSub').textContent =
+    'Distances de décollage & d\'atterrissage — ' + ac.label + (ac.tail ? ' · '+ac.tail : '') + ' — d\'après le Manuel de Vol';
+
+  // pied de page
+  document.getElementById('footerText').innerHTML = '<b>Données</b> : ' + ac.dataNote;
+
+  onMasseInput(true);
+}
+
+function setPiste(p){
+  piste = p;
+  document.getElementById('piste-dur').classList.toggle('active', p==='dur');
+  document.getElementById('piste-herbe').classList.toggle('active', p==='herbe');
+  calc();
+}
+
+function onMasseInput(skipCalc){
+  const el = document.getElementById('masse');
+  const max = parseFloat(el.max);
+  if (!el.readOnly && el.value !== '' && parseFloat(el.value) > max) el.value = max;
+  masseParCombo[currentAircraft+':'+phase] = parseFloat(el.value) || masseParCombo[currentAircraft+':'+phase];
+  if (!skipCalc) calc();
+}
+
+// =====================================================================
+// CALCUL PRINCIPAL
+// =====================================================================
+function calc(){
+  const ac = AIRCRAFT[currentAircraft];
+  const pd = ac[phase];
+
+  const masse = parseFloat(document.getElementById('masse').value) || 0;
+  const altiTerrain = parseFloat(document.getElementById('altiTerrain').value) || 0;
+  const qnh = parseFloat(document.getElementById('qnh').value);
+  const qnhVal = isNaN(qnh) ? 1013 : qnh;
+  const alti = altiTerrain + (1013 - qnhVal) * 30;
+  document.getElementById('alti').value = fmt(alti);
+  const temp  = parseFloat(document.getElementById('temp').value) || 0;
+  const qfu   = parseFloat(document.getElementById('qfu').value) || 0;
+  const ventDir   = parseFloat(document.getElementById('ventDir').value) || 0;
+  const ventForce = parseFloat(document.getElementById('ventForce').value) || 0;
+  const pisteLenVal = parseFloat(document.getElementById('pisteLen').value);
+
+  const wc = windComponents(ventDir, ventForce, qfu);
+  updateWindArrow(wc.angle);
+
+  const hwAbs = Math.abs(wc.headwind);
+  document.getElementById('wr-hw').textContent =
+    ventForce===0 ? '0 kt' : fmt(hwAbs) + ' kt ' + (wc.headwind>=0 ? '(face)' : '(arrière)');
+  const xwAbs = Math.abs(wc.crosswind);
+  document.getElementById('wr-xw').textContent =
+    ventForce===0 ? '0 kt' : fmt(xwAbs) + ' kt ' + (xwAbs<0.5 ? '' : (wc.crosswind>0 ? '(droite)' : '(gauche)'));
+
+  const CROSSWIND_LIMIT = ac.crosswind[phase];
+  const wrXwEl = document.getElementById('wr-xw');
+  wrXwEl.style.color = xwAbs >= CROSSWIND_LIMIT ? 'var(--red)' : '';
+
+  const limitMsg = document.getElementById('windLimitMsg');
+  if (xwAbs >= CROSSWIND_LIMIT){
+    limitMsg.innerHTML = '⚠ Traversier ' + fmt(xwAbs) + ' kt ≥ limite démontrée (' + CROSSWIND_LIMIT + ' kt)';
+    limitMsg.style.color = 'var(--red)';
+    limitMsg.classList.add('show');
+  } else {
+    limitMsg.classList.remove('show');
+  }
+
+  let res;
+  if (pd.altitudes){
+    res = computeGrid(ac, pd, masse, alti, temp, wc.headwind);
+  } else {
+    res = computeFixed(ac, pd, wc.headwind);
+  }
+
+  document.getElementById('roll-m').textContent = fmt(res.roll);
+  document.getElementById('roll-ft').textContent = toFt(res.roll) + ' ft';
+  document.getElementById('d15-m').textContent = fmt(res.d15);
+  document.getElementById('d15-ft').textContent = toFt(res.d15) + ' ft';
+
+  const sp = ac.speeds[phase];
+  document.getElementById('vval1').textContent = sp.v1 || '—';
+  document.getElementById('vval2').textContent = sp.v2 || '—';
+
+  const warnBox = document.getElementById('warnBox');
+  let allWarnings = res.warnings.slice();
+  if (!pd.altitudes && pd.conditionNote) allWarnings.push(pd.conditionNote);
+  const refMass = !pd.altitudes ? pd.mass : (pd.massHigh===pd.massLow ? pd.massHigh : null);
+  if (refMass !== null && masse !== refMass){
+    allWarnings.push("Le manuel ne fournit des performances qu'à " + refMass + " kg pour cet avion (pas de formule de correction masse) — les distances affichées correspondent à " + refMass + " kg, pas à la masse saisie.");
+  }
+  if (allWarnings.length){
+    warnBox.innerHTML = '⚠ ' + allWarnings.join('<br>⚠ ');
+    warnBox.classList.add('show');
+  } else {
+    warnBox.classList.remove('show');
+  }
+
+  const rwSection = document.getElementById('runwaySection');
+  if (pisteLenVal && pisteLenVal > 0){
+    rwSection.style.display = 'block';
+    const pct = Math.min(100, (res.d15/pisteLenVal)*100);
+    document.getElementById('rwFill').style.width = pct + '%';
+    document.getElementById('rwNeed').style.left = pct + '%';
+    document.getElementById('rwAvailLabel').textContent = pisteLenVal + ' m disponibles';
+    const margin = pisteLenVal - res.d15;
+    const marginEl = document.getElementById('rwMargin');
+    const marginPct = (margin/pisteLenVal)*100;
+    marginEl.textContent = (margin>=0?'+':'') + fmt(margin) + ' m  (' + fmt(marginPct) + ' %)';
+    marginEl.className = 'val ' + (margin<0 ? 'bad' : (marginPct<20 ? 'marg' : 'ok'));
+  } else {
+    rwSection.style.display = 'none';
+  }
+}
+
+refreshPhaseUI();
+calc();
+</script>
+</body>
+</html>
