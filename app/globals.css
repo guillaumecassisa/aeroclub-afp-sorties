@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+@theme {
+  /* Charte inspirée d'Air France : bleu marine profond, rouge en accent, beaucoup de blanc */
+  --color-navy: #051c4b;
+  --color-navy-2: #002157;
+  --color-sky: #002157;
+  --color-sky-soft: #eef2f8;
+  --color-red: #e4002b;
+  --color-paper: #f4f5f7;
+  --color-line: #dfe3ea;
+  --color-ink: #14213d;
+  --color-muted: #5f6b7d;
+  --color-ok: #1d6b45;
+  --color-ok-soft: #e7f3ec;
+  --color-wait: #9a5b0a;
+  --color-wait-soft: #fbf2e2;
+  --color-danger: #c8102e;
+  --color-danger-soft: #fdecee;
+  --font-sans: "Helvetica Neue", Helvetica, Arial, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+}
+
+@utility card {
+  @apply rounded-lg border border-line bg-white shadow-[0_1px_2px_rgba(5,28,75,0.04)];
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-60;
+}
+@utility btn-primary {
+  @apply btn bg-navy-2 text-white hover:bg-navy;
+}
+@utility btn-secondary {
+  @apply btn border border-navy-2/25 bg-white text-navy-2 hover:border-navy-2 hover:bg-sky-soft;
+}
+@utility btn-danger {
+  @apply btn border border-danger/40 bg-white text-danger hover:bg-danger-soft;
+}
+
+@utility field {
+  @apply block w-full rounded-md border border-line bg-white px-3 py-2.5 text-base text-ink outline-none focus:border-navy-2 focus:ring-2 focus:ring-navy-2/15 sm:text-sm;
+}
+@utility label {
+  @apply mb-1 block text-sm font-medium text-ink;
+}
+
+@utility pill {
+  @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold whitespace-nowrap;
+}
+
+/* Le "trait" Air France : filet marine avec une touche de rouge */
+@utility af-stripe {
+  height: 3px;
+  background: linear-gradient(90deg, var(--color-navy-2) 0 72%, #fff 72% 72.6%, var(--color-red) 72.6% 100%);
+}
