@@ -16,6 +16,7 @@ export const TIP_CATEGORIES = [
   { key: "avitaillement", label: "Avitaillement", icon: "⛽" },
   { key: "hebergement", label: "Hébergement", icon: "🛏️" },
   { key: "visite", label: "À voir", icon: "📸" },
+  { key: "taxes", label: "Taxes", icon: "💰" },
   { key: "autre", label: "Autre", icon: "📌" },
 ] as const;
 

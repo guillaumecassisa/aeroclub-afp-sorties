@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AERODROMES, TIP_CATEGORIES } from "@/lib/aerodromes";
-import { requireMember } from "@/lib/auth";
+import { requireMember, requireAdmin } from "@/lib/auth";
 
 function back(key: "ok" | "erreur", msg: string, icao?: string): never {
   revalidatePath("/bons-plans");
@@ -59,7 +59,7 @@ export async function addTip(formData: FormData) {
 }
 
 export async function archiveTip(id: string, icao: string) {
-  await requireMember();
+  await requireAdmin();
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("airfield_tips")
