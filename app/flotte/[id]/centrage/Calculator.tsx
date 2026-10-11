@@ -51,23 +51,25 @@ export function Calculator({ data, title }: { data: MbData; title: string }) {
           </ul>
           <Heading className="mt-4">Carburant</Heading>
           <ul className="divide-y divide-line">
-            <li className="flex items-center gap-3 py-2.5">
-              <label className="min-w-0 flex-1" htmlFor="fuel">
-                <span className="block text-sm font-semibold text-ink">
-                  {data.stations.some((s) => s.fuel) ? "Réservoir principal" : "Carburant embarqué"}
-                </span>
-                <span className="block text-[11px] text-muted">
-                  {fmt(num(fuel) * data.fuel_density)} kg
-                  {data.fuel_capacity_l ? ` · capacité ${data.fuel_capacity_l} L` : ""} · bras {fmt(Number(data.fuel_arm), 2, 4)} m
-                </span>
-              </label>
-              <input id="fuel" inputMode="decimal" value={fuel} placeholder="0" onChange={(e) => setFuel(e.target.value)} className="field w-24 py-1.5 text-center" />
-              <span className="w-6 text-xs text-muted">L</span>
-            </li>
+            {/* Réservoir principal : affiché seulement si une capacité est définie (avions avec réservoir central) */}
+            {data.fuel_capacity_l != null && data.fuel_capacity_l > 0 && (
+              <li className="flex items-center gap-3 py-2.5">
+                <label className="min-w-0 flex-1" htmlFor="fuel">
+                  <span className="block text-sm font-semibold text-ink">
+                    {data.stations.some((s) => s.fuel) ? "Réservoir principal" : "Carburant embarqué"}
+                  </span>
+                  <span className="block text-[11px] text-muted">
+                    {fmt(num(fuel) * data.fuel_density)} kg · capacité {data.fuel_capacity_l} L · bras {fmt(Number(data.fuel_arm), 2, 4)} m
+                  </span>
+                </label>
+                <input id="fuel" inputMode="decimal" value={fuel} placeholder="0" onChange={(e) => setFuel(e.target.value)} className="field w-24 py-1.5 text-center" />
+                <span className="w-6 text-xs text-muted">L</span>
+              </li>
+            )}
             <li className="flex items-center gap-3 py-2.5">
               <label className="min-w-0 flex-1" htmlFor="trip">
                 <span className="block text-sm font-semibold text-ink">
-                  Délestage prévu (trip fuel){data.stations.some((s) => s.fuel) ? ", pris sur le réservoir principal" : ""}
+                  Délestage prévu (trip fuel){data.fuel_capacity_l ? ", pris sur le réservoir principal" : ""}
                 </span>
                 <span className="block text-[11px] text-muted">{fmt(num(trip) * data.fuel_density)} kg</span>
               </label>

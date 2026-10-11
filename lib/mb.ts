@@ -90,6 +90,7 @@ export function compute(d: MbData, loads: number[], fuelL: number, tripL: number
   if (tripL > fuelL) problems.push("Le délestage prévu dépasse le carburant embarqué.");
 
   const fa = Number(d.fuel_arm);
+  const hasPrimaryTank = d.fuel_capacity_l != null && d.fuel_capacity_l > 0;
   let payloadMass = 0, payloadMoment = 0, extraFuelMass = 0, extraFuelMoment = 0, wingMass = 0;
   d.stations.forEach((s, i) => {
     const m = kg(s, loads[i] ?? 0);
@@ -107,9 +108,16 @@ export function compute(d: MbData, loads: number[], fuelL: number, tripL: number
   const fuelKg = fuelL * d.fuel_density;
   const tripKg = Math.min(tripL, fuelL) * d.fuel_density;
 
+  // Bras du trip fuel : réservoir principal si défini, sinon bras moyen pondéré des réservoirs en station
+  const tripArm = hasPrimaryTank
+    ? fa
+    : extraFuelMass > 0
+      ? extraFuelMoment / extraFuelMass
+      : fa;
+
   const zf = point(zfMass, zfMoment);
   const to = point(zfMass + extraFuelMass + fuelKg, zfMoment + extraFuelMoment + fuelKg * fa);
-  const ldg = point(to.mass - tripKg, to.moment - tripKg * fa);
+  const ldg = point(to.mass - tripKg, to.moment - tripKg * tripArm);
   const zeroWing = zfMass - wingMass;
 
   if (d.mtow && to.mass > Number(d.mtow) + 1e-9) problems.push(`Masse au décollage ${f1(to.mass)} kg > MTOW ${d.mtow} kg.`);
