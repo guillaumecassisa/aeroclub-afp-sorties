@@ -62,12 +62,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <NavLink href="/preparer-son-vol">Préparer son vol</NavLink>
                 <NavLink href="/bons-plans">Bons plans</NavLink>
                 <NavLink href="/shop">Le shop</NavLink>
-                {profile?.role === "admin" && <NavLink href="/shop/admin">Shop (admin)</NavLink>}
                 <NavLink href="/bar" exact>Bar</NavLink>
                 <NavLink href="/flotte">Flotte</NavLink>
                 {canManageFleet(profile) && <NavLink href="/maintenance">Flotte (maintenance)</NavLink>}
                 {profile?.role === "admin" && <NavLink href="/droits">Gestion des droits</NavLink>}
                 <span className="ml-auto" aria-hidden />
+                <NavLink href="/shareflight">Shareflight</NavLink>
                 <NavLink href="/annuaire">Annuaire</NavLink>
               </div>
             </nav>
