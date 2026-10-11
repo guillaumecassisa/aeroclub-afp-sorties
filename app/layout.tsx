@@ -25,15 +25,27 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body className="font-sans antialiased">
         <header className="sticky top-0 z-10 bg-white print:hidden">
           <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-2.5">
-            <Link href="/" className="flex min-w-0 items-center gap-3">
-              <Image src="/logo.png" alt="" width={44} height={44} priority className="h-11 w-11 shrink-0" />
-              <span className="hidden min-w-0 leading-tight min-[430px]:block">
-                <span className="block text-[10px] font-semibold tracking-[0.2em] text-muted uppercase">Aéroclub</span>
-                <span className="block truncate text-[15px] font-bold tracking-tight text-navy-2">
-                  {CLUB_NAME.replace(/^Aéroclub\s+/i, "")}
+            {approved ? (
+              <Link href="/" className="flex min-w-0 items-center gap-3">
+                <Image src="/logo.png" alt="" width={44} height={44} priority className="h-11 w-11 shrink-0" />
+                <span className="hidden min-w-0 leading-tight min-[430px]:block">
+                  <span className="block text-[10px] font-semibold tracking-[0.2em] text-muted uppercase">Aéroclub</span>
+                  <span className="block truncate text-[15px] font-bold tracking-tight text-navy-2">
+                    {CLUB_NAME.replace(/^Aéroclub\s+/i, "")}
+                  </span>
                 </span>
-              </span>
-            </Link>
+              </Link>
+            ) : (
+              <div className="flex min-w-0 items-center gap-3">
+                <Image src="/logo.png" alt="" width={44} height={44} priority className="h-11 w-11 shrink-0" />
+                <span className="hidden min-w-0 leading-tight min-[430px]:block">
+                  <span className="block text-[10px] font-semibold tracking-[0.2em] text-muted uppercase">Aéroclub</span>
+                  <span className="block truncate text-[15px] font-bold tracking-tight text-navy-2">
+                    {CLUB_NAME.replace(/^Aéroclub\s+/i, "")}
+                  </span>
+                </span>
+              </div>
+            )}
             {profile && (
               <div className="flex items-center gap-1">
               {approved && (
