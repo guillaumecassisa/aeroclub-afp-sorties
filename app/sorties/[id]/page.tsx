@@ -55,7 +55,7 @@ export default async function Page({
     .eq("outing_id", id)
     .order("position");
 
-  const aircraft = (aircraftRaw ?? []).map((r) => r.aircraft).filter(Boolean);
+  const aircraft = (aircraftRaw ?? []).map((r) => r.aircraft as unknown as { id: string; registration: string; model: string; seats: number } | null).filter(Boolean) as { id: string; registration: string; model: string; seats: number }[];
 
   const isOpen = outing.status === "open";
   const canManage = isStaff(me) || outing.instructor?.id === me.id;
@@ -186,7 +186,7 @@ export default async function Page({
             ) : (
               <ul className="divide-y divide-line">
                 {confirmed.map((r) => {
-                  const m = r.member as { full_name: string } | null;
+                  const m = r.member as unknown as { full_name: string } | null;
                   return (
                     <li key={r.id} className="px-4 py-2 text-sm text-ink">
                       {m?.full_name ?? "—"}
@@ -204,7 +204,7 @@ export default async function Page({
               </div>
               <ul className="divide-y divide-line">
                 {waitlist.map((r, i) => {
-                  const m = r.member as { full_name: string } | null;
+                  const m = r.member as unknown as { full_name: string } | null;
                   return (
                     <li key={r.id} className="flex items-center gap-2 px-4 py-2 text-sm text-ink">
                       <span className="text-xs text-muted">{i + 1}.</span>

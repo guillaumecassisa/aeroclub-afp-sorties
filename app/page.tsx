@@ -92,7 +92,7 @@ export default async function Page({
     .gte("created_at", `${year}-01-01`);
   const byUser = new Map<string, { name: string; total: number }>();
   for (const c of equipageRaw ?? []) {
-    const p = c.profile as { full_name: string } | null;
+    const p = c.profile as unknown as { full_name: string } | null;
     const name = p?.full_name ?? "?";
     const prev = byUser.get(c.user_id) ?? { name, total: 0 };
     byUser.set(c.user_id, { ...prev, total: prev.total + c.unit_price_cents * c.quantity });
