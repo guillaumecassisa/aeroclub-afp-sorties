@@ -11,6 +11,14 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   const sp = await searchParams;
   const supabase = await createClient();
 
+  // Avions du club actifs (non archivés)
+  const { data: aircraftRows } = await supabase
+    .from("aircraft")
+    .select("registration, model")
+    .is("archived_at", null)
+    .order("registration");
+  const clubAircraft = (aircraftRows ?? []) as { registration: string; model: string }[];
+
   // Charger les vols + passagers inscrits + noms via join profiles
   const { data } = await supabase
     .from("flight_shares")
@@ -73,7 +81,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
       <Banner ok={sp.ok} erreur={sp.erreur} />
       {/* FlightBoard prend toute la hauteur dispo — on annule le padding du layout */}
       <div className="-mx-4 -my-6 -mb-10">
-        <FlightBoard flights={flights} meId={me.id} admin={me.role === "admin"} />
+        <FlightBoard flights={flights} meId={me.id} admin={me.role === "admin"} clubAircraft={clubAircraft} />
       </div>
     </>
   );
