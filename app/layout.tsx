@@ -64,6 +64,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <NavLink href="/shop">Le shop</NavLink>
                 {profile?.role === "admin" && <NavLink href="/shop/admin">Shop (admin)</NavLink>}
                 <NavLink href="/bar" exact>Bar</NavLink>
+                {(profile?.role === "admin" || profile?.is_treasurer) && <NavLink href="/stats">Stats</NavLink>}
                 <NavLink href="/flotte">Flotte</NavLink>
                 {canManageFleet(profile) && <NavLink href="/maintenance">Flotte (maintenance)</NavLink>}
                 {profile?.role === "admin" && <NavLink href="/droits">Gestion des droits</NavLink>}
