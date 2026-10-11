@@ -73,7 +73,7 @@ export async function upsertItem(formData: FormData) {
   const category = String(formData.get("category") ?? "").trim() || null;
   const sizes = String(formData.get("sizes") ?? "").trim() || null;
   const colors = String(formData.get("colors") ?? "").trim() || null;
-  const active = formData.get("active") !== "false";
+  const active = formData.get("active") === "true";
   const image_url = String(formData.get("image_url") ?? "").trim() || null;
 
   if (!name) redirect("/shop/admin?erreur=" + encodeURIComponent("Le nom est obligatoire."));
