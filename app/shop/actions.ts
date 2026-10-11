@@ -81,14 +81,11 @@ export async function cancelOrder(orderId: string) {
 
 // ── Admin : mettre à jour le statut d'une commande ──────────────────────────
 
-export async function updateOrderStatus(formData: FormData) {
+export async function updateOrderStatus(orderId: string, status: string) {
   await requireAdmin();
   const supabase = await createClient();
 
-  const order_id = formData.get("order_id") as string;
-  const status = formData.get("status") as string;
-
-  await supabase.from("shop_orders").update({ status }).eq("id", order_id);
+  await supabase.from("shop_orders").update({ status }).eq("id", orderId);
 
   revalidatePath("/shop/admin");
   redirect("/shop/admin?ok=Statut+mis+à+jour");
