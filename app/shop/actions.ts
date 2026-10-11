@@ -19,18 +19,16 @@ export async function placeOrder(formData: FormData) {
 
   if (!item_id) redirect("/shop?erreur=Article+manquant");
 
-  // Lire l'article sans RLS (service role via select direct)
-  // On utilise maybeSingle pour éviter l'erreur PGRST116 si RLS bloque
-  const { data: item, error: ie } = await supabase
+  const { data: items, error: ie } = await supabase
     .from("shop_items")
     .select("id, name, price_cents, active, sizes, colors")
     .eq("id", item_id)
-    .maybeSingle();
+    .limit(1);
 
-  console.log("[shop/placeOrder] item_id=", item_id, "item=", item, "error=", ie);
+  const item = items?.[0] ?? null;
 
   if (ie) redirect(`/shop?erreur=${encodeURIComponent(ie.message)}`);
-  if (!item) redirect("/shop?erreur=Article+introuvable+(RLS+bloqué+ou+ID+invalide)");
+  if (!item) redirect("/shop?erreur=Article+introuvable");
   if (!item.active) redirect("/shop?erreur=Article+non+disponible");
 
   // Vérifications
