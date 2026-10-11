@@ -73,9 +73,6 @@ export default async function Page({
   const activeOrders = orders.filter((o) => !["delivered", "cancelled"].includes(o.status));
   const historyOrders = orders.filter((o) => ["delivered", "cancelled"].includes(o.status));
 
-  // Group items by category
-  const categories = [...new Set(items.map((i) => i.category ?? "Autres"))];
-
   return (
     <>
       <Banner ok={sp.ok} erreur={sp.erreur} />
@@ -92,14 +89,8 @@ export default async function Page({
       {items.length === 0 ? (
         <div className="card p-8 text-center text-muted">Le catalogue est vide pour le moment.</div>
       ) : (
-        <div className="space-y-8">
-          {categories.map((cat) => (
-            <section key={cat}>
-              <h2 className="mb-3 text-lg font-bold tracking-tight text-navy-2">{cat}</h2>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {items
-                  .filter((i) => (i.category ?? "Autres") === cat)
-                  .map((item) => {
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {items.map((item) => {
                     const sizeOptions = item.sizes
                       ? item.sizes.split(",").map((s) => s.trim()).filter(Boolean)
                       : [];
@@ -168,10 +159,7 @@ export default async function Page({
                         </div>
                       </div>
                     );
-                  })}
-              </div>
-            </section>
-          ))}
+          })}
         </div>
       )}
 
