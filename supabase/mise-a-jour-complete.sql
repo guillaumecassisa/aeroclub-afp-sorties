@@ -2840,6 +2840,11 @@ notify pgrst, 'reload schema';
 -- =====================================================================
 \i supabase/migration-25-instructeur-referent.sql
 
+-- =====================================================================
+--  Mise à jour n°26 : données masse & centrage depuis les manuels de vol
+-- =====================================================================
+\i supabase/migration-26-aircraft-mb-data.sql
+
 -- ===================== Vérification finale =====================
 notify pgrst, 'reload schema';
 select
