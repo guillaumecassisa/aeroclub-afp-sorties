@@ -82,9 +82,46 @@ export async function updateOrderStatus(orderId: string, status: string) {
   await requireAdmin();
   const supabase = await createClient();
 
+  // Si on passe en "delivered", on débite l'ardoise du membre
+  if (status === "delivered") {
+    // Récupérer les infos de la commande
+    const { data: orders } = await supabase
+      .from("shop_orders")
+      .select("user_id, item_name, price_cents, quantity, size, color, ardoise_charged")
+      .eq("id", orderId)
+      .limit(1);
+
+    const order = orders?.[0] ?? null;
+
+    if (order && !order.ardoise_charged && order.price_cents > 0) {
+      // Construire le libellé pour l'ardoise
+      const variant = [order.size, order.color].filter(Boolean).join(" / ");
+      const label = variant
+        ? `Shop – ${order.item_name} (${variant})`
+        : `Shop – ${order.item_name}`;
+
+      // Insérer dans bar_consumptions au nom du membre
+      const { error: barError } = await supabase.from("bar_consumptions").insert({
+        user_id: order.user_id,
+        product_name: label,
+        unit_price_cents: order.price_cents,
+        quantity: order.quantity,
+      });
+
+      if (!barError) {
+        // Marquer la commande comme débitée
+        await supabase
+          .from("shop_orders")
+          .update({ ardoise_charged: true })
+          .eq("id", orderId);
+      }
+    }
+  }
+
   await supabase.from("shop_orders").update({ status }).eq("id", orderId);
 
   revalidatePath("/shop/admin");
+  revalidatePath("/bar/tresorerie");
   redirect("/shop/admin?ok=Statut+mis+a+jour");
 }
 
