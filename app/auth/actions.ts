@@ -70,7 +70,7 @@ export async function signup(_: FormState, formData: FormData): Promise<FormStat
     },
   });
   if (error) return { error: translate(error.message) };
-  if (data.session) redirect("/"); // confirmation email désactivée côté Supabase
+  if (data.session) redirect("/en-attente"); // confirmation email désactivée côté Supabase
   return {
     ok: "Compte créé ! Cliquez sur le lien reçu par email pour confirmer votre adresse. Un administrateur du club validera ensuite votre compte.",
   };
