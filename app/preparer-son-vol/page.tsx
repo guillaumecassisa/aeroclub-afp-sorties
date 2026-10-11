@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { requireMember } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Préparer son vol" };
@@ -6,66 +7,33 @@ export const metadata: Metadata = { title: "Préparer son vol" };
 export default async function Page() {
   await requireMember();
 
-  const tools = [
+  const externalTools = [
     {
-      title: "Météo – Météo France Aviation",
+      title: "Météo France Aviation",
       description: "Bulletins météo, TEMSI, vent en altitude pour la France.",
       href: "https://aviation.meteo.fr",
       icon: "🌤️",
     },
     {
-      title: "NOTAM – SIA",
-      description: "Consultation des NOTAMs France sur le site du Service de l'Information Aéronautique.",
-      href: "https://www.sia.aviation-civile.gouv.fr/",
-      icon: "📋",
+      title: "Sofia Briefing",
+      description: "Briefing météo aéronautique complet : METAR, TAF, SIGMET, vent en altitude.",
+      href: "https://sofia.aero",
+      icon: "🛫",
+    },
+  ];
+
+  const internalTools = [
+    {
+      title: "Masse & centrage",
+      description: "Calculer la masse et le centrage avant le vol.",
+      href: "/centrage",
+      icon: "⚖️",
     },
     {
-      title: "Plan de vol – SIA",
-      description: "Déposer ou annuler un plan de vol via le portail SIA.",
-      href: "https://www.sia.aviation-civile.gouv.fr/",
-      icon: "✈️",
-    },
-    {
-      title: "Aéroport.fr – Fiches terrain",
-      description: "Fiches de terrains, fréquences, procédures et cartes VAC.",
-      href: "https://www.aeroport.fr/",
-      icon: "🛬",
-    },
-    {
-      title: "SkyDemon",
-      description: "Planification de vol VFR, météo intégrée, NOTAMs et espace aérien.",
-      href: "https://www.skydemon.aero/",
-      icon: "🗺️",
-    },
-    {
-      title: "EuroFPL",
-      description: "Dépôt de plan de vol IFR/VFR en ligne.",
-      href: "https://www.eurofpl.eu/",
-      icon: "📡",
-    },
-    {
-      title: "WindyTy",
-      description: "Visualisation des vents et du temps en altitude.",
-      href: "https://www.windy.com/",
-      icon: "💨",
-    },
-    {
-      title: "Aviation Française – Espaces aériens",
-      description: "Carte interactive des espaces aériens français.",
-      href: "https://www.sia.aviation-civile.gouv.fr/documents/supp/map/",
-      icon: "🗾",
-    },
-    {
-      title: "METAR / TAF – NOAA",
-      description: "Rapports METAR et prévisions TAF pour tous les aérodromes.",
-      href: "https://aviationweather.gov/",
-      icon: "📊",
-    },
-    {
-      title: "Réglementation – DGAC",
-      description: "Réglementation aéronautique, textes officiels, FCL.",
-      href: "https://www.ecologie.gouv.fr/direction-generale-laviation-civile-dgac",
-      icon: "📜",
+      title: "Performances",
+      description: "Distances de décollage et d'atterrissage selon les conditions.",
+      href: "/centrage",
+      icon: "📐",
     },
   ];
 
@@ -110,24 +78,44 @@ export default async function Page() {
         </div>
 
         {/* Outils */}
-        <div className="lg:col-span-2">
-          <h2 className="mb-3 text-lg font-bold tracking-tight text-navy-2">Outils en ligne</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {tools.map((tool) => (
-              <a
-                key={tool.href}
-                href={tool.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="card flex items-start gap-3 p-4 transition hover:shadow-md"
-              >
-                <span className="text-2xl">{tool.icon}</span>
-                <div>
-                  <p className="font-semibold text-navy-2">{tool.title}</p>
-                  <p className="mt-0.5 text-xs text-muted">{tool.description}</p>
-                </div>
-              </a>
-            ))}
+        <div className="lg:col-span-2 space-y-5">
+          <div>
+            <h2 className="mb-3 text-lg font-bold tracking-tight text-navy-2">Outils du club</h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {internalTools.map((tool) => (
+                <Link
+                  key={tool.title}
+                  href={tool.href}
+                  className="card flex items-start gap-3 p-4 transition hover:shadow-md"
+                >
+                  <span className="text-2xl">{tool.icon}</span>
+                  <div>
+                    <p className="font-semibold text-navy-2">{tool.title}</p>
+                    <p className="mt-0.5 text-xs text-muted">{tool.description}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h2 className="mb-3 text-lg font-bold tracking-tight text-navy-2">Météo</h2>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {externalTools.map((tool) => (
+                <a
+                  key={tool.href}
+                  href={tool.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="card flex items-start gap-3 p-4 transition hover:shadow-md"
+                >
+                  <span className="text-2xl">{tool.icon}</span>
+                  <div>
+                    <p className="font-semibold text-navy-2">{tool.title}</p>
+                    <p className="mt-0.5 text-xs text-muted">{tool.description}</p>
+                  </div>
+                </a>
+              ))}
+            </div>
           </div>
         </div>
       </div>
