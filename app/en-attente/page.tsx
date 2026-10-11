@@ -13,7 +13,7 @@ export default async function Page() {
         Bienvenue {profile.full_name?.split(" ")[0] || "à toi"} !
       </p>
       <p className="mt-3 text-sm leading-relaxed text-muted text-center">
-        Ton compte est bien créé. Reviens dans quelques tours de piste&nbsp;😉
+        Ton compte est bien créé et en attente de validation. Reviens dans quelques tours de piste&nbsp;😉
       </p>
       <p className="mt-4 text-xs text-muted text-center">
         Un administrateur du club va valider ton inscription. Tu recevras un accès complet au site dès que c&apos;est fait.
