@@ -95,7 +95,7 @@ export function ShopItemForm({
 
         {/* Image */}
         <div>
-          <label className="mb-1 block text-xs font-medium text-muted">Photo de l'article</label>
+          <label className="mb-1 block text-xs font-medium text-muted">Photo de l&apos;article</label>
           <div className="flex flex-wrap items-start gap-4">
             {/* Preview */}
             <div className="relative h-32 w-32 shrink-0 overflow-hidden rounded-xl border border-line bg-paper">
