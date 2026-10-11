@@ -140,7 +140,7 @@ export default async function Page({
             <p className="mb-1 text-[10px] font-semibold tracking-widest text-white/60 uppercase">
               METAR LFML · {metar ? `il y a ${Math.round((Date.now() - new Date(metar.observedAt).getTime()) / 60000)} min` : "—"}
             </p>
-            <WeatherCard metar={metar} compact />
+            <WeatherCard metar={metar} compact dark />
           </div>
         </div>
       </div>
