@@ -2,35 +2,67 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { requireMember, requireAdmin } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+
+// ── Passer une commande ──────────────────────────────────────────────────────
 
 export async function placeOrder(formData: FormData) {
   const me = await requireMember();
   const supabase = await createClient();
 
-  const item_id = String(formData.get("item_id") ?? "").trim();
-  const size = String(formData.get("size") ?? "").trim() || null;
-  const color = String(formData.get("color") ?? "").trim() || null;
-  const quantity = Math.max(1, Number(formData.get("quantity") ?? 1));
-  const note = String(formData.get("note") ?? "").trim() || null;
+  const item_id = formData.get("item_id") as string;
+  const quantity = Math.max(1, parseInt(formData.get("quantity") as string, 10) || 1);
+  const size = (formData.get("size") as string) || null;
+  const color = (formData.get("color") as string) || null;
+  const note = (formData.get("note") as string) || null;
 
-  if (!item_id) redirect("/shop?erreur=" + encodeURIComponent("Article introuvable."));
+  if (!item_id) redirect("/shop?erreur=Article+manquant");
+
+  // Lire l'article sans RLS (service role via select direct)
+  // On utilise maybeSingle pour éviter l'erreur PGRST116 si RLS bloque
+  const { data: item, error: ie } = await supabase
+    .from("shop_items")
+    .select("id, name, price_cents, active, sizes, colors")
+    .eq("id", item_id)
+    .maybeSingle();
+
+  console.log("[shop/placeOrder] item_id=", item_id, "item=", item, "error=", ie);
+
+  if (ie) redirect(`/shop?erreur=${encodeURIComponent(ie.message)}`);
+  if (!item) redirect("/shop?erreur=Article+introuvable+(RLS+bloqué+ou+ID+invalide)");
+  if (!item.active) redirect("/shop?erreur=Article+non+disponible");
+
+  // Vérifications
+  if (item.sizes && item.sizes.length > 0 && !size) {
+    redirect(`/shop?erreur=Veuillez+choisir+une+taille`);
+  }
+  if (item.colors && item.colors.length > 0 && !color) {
+    redirect(`/shop?erreur=Veuillez+choisir+une+couleur`);
+  }
+
+  const itemName = item.name ?? "Article";
 
   const { error } = await supabase.from("shop_orders").insert({
     user_id: me.id,
-    item_id,
-    size,
-    color,
+    item_id: item.id,
+    item_name: itemName,
+    price_cents: item.price_cents,
     quantity,
-    note,
-    status: "pending",
+    size: size || null,
+    color: color || null,
+    note: note || null,
   });
 
-  if (error) redirect("/shop?erreur=" + encodeURIComponent(error.message));
+  console.log("[shop/placeOrder] insert error=", error);
+
+  if (error) redirect(`/shop?erreur=${encodeURIComponent(error.message)}`);
+
   revalidatePath("/shop");
-  redirect("/shop?ok=" + encodeURIComponent("Commande passée !"));
+  redirect("/shop?ok=Commande+enregistrée+✓+Le+trésorier+vous+contactera+pour+la+suite");
 }
+
+// ── Annuler ma commande ──────────────────────────────────────────────────────
 
 export async function cancelOrder(orderId: string) {
   const me = await requireMember();
@@ -41,68 +73,96 @@ export async function cancelOrder(orderId: string) {
     .update({ status: "cancelled" })
     .eq("id", orderId)
     .eq("user_id", me.id)
-    .eq("status", "pending");
+    .in("status", ["pending"]);
 
-  if (error) redirect("/shop?erreur=" + encodeURIComponent(error.message));
+  if (error) redirect("/shop?erreur=Impossible+d'annuler+cette+commande");
+
   revalidatePath("/shop");
-  redirect("/shop?ok=" + encodeURIComponent("Commande annulée."));
+  redirect("/shop?ok=Commande+annulée");
 }
 
-export async function updateOrderStatus(orderId: string, status: string) {
+// ── Admin : mettre à jour le statut d'une commande ──────────────────────────
+
+export async function updateOrderStatus(formData: FormData) {
   await requireAdmin();
   const supabase = await createClient();
 
-  const { error } = await supabase
-    .from("shop_orders")
-    .update({ status })
-    .eq("id", orderId);
+  const order_id = formData.get("order_id") as string;
+  const status = formData.get("status") as string;
 
-  if (error) redirect("/shop/admin?erreur=" + encodeURIComponent(error.message));
+  await supabase.from("shop_orders").update({ status }).eq("id", order_id);
+
   revalidatePath("/shop/admin");
-  redirect("/shop/admin?ok=" + encodeURIComponent("Statut mis à jour."));
+  redirect("/shop/admin?ok=Statut+mis+à+jour");
 }
+
+// ── Admin : créer/modifier un article ───────────────────────────────────────
 
 export async function upsertItem(formData: FormData) {
   await requireAdmin();
   const supabase = await createClient();
 
-  const id = String(formData.get("id") ?? "").trim() || null;
-  const name = String(formData.get("name") ?? "").trim();
-  const description = String(formData.get("description") ?? "").trim() || null;
-  const price_cents = Math.round(Number(String(formData.get("price") ?? "0").replace(",", ".")) * 100);
-  const category = String(formData.get("category") ?? "").trim() || null;
-  const sizes = String(formData.get("sizes") ?? "").trim() || null;
-  const colors = String(formData.get("colors") ?? "").trim() || null;
-  const active = formData.get("active") === "true";
-  const image_url = String(formData.get("image_url") ?? "").trim() || null;
+  const id = (formData.get("id") as string) || undefined;
+  const name = formData.get("name") as string;
+  const description = (formData.get("description") as string) || null;
+  const price_str = (formData.get("price") as string).replace(",", ".");
+  const price_cents = Math.round(parseFloat(price_str || "0") * 100);
+  const category = (formData.get("category") as string) || "vetement";
+  const sizesRaw = (formData.get("sizes") as string) || "";
+  const colorsRaw = (formData.get("colors") as string) || "";
+  const image_url = (formData.get("image_url") as string) || null;
+  const position = parseInt(formData.get("position") as string, 10) || 0;
+  const active = formData.get("active") === "on";
 
-  if (!name) redirect("/shop/admin?erreur=" + encodeURIComponent("Le nom est obligatoire."));
+  const sizes = sizesRaw.split(",").map((s) => s.trim()).filter(Boolean);
+  const colors = colorsRaw.split(",").map((c) => c.trim()).filter(Boolean);
+
+  if (!name) redirect("/shop/admin?erreur=Nom+requis");
+
+  const payload = {
+    name,
+    description,
+    price_cents,
+    category,
+    sizes: sizes.length ? sizes : null,
+    colors: colors.length ? colors : null,
+    image_url,
+    position,
+    active,
+  };
 
   if (id) {
-    const { error } = await supabase
-      .from("shop_items")
-      .update({ name, description, price_cents, category, sizes, colors, active, image_url })
-      .eq("id", id);
-    if (error) redirect("/shop/admin?erreur=" + encodeURIComponent(error.message));
+    await supabase.from("shop_items").update(payload).eq("id", id);
   } else {
-    const { error } = await supabase
-      .from("shop_items")
-      .insert({ name, description, price_cents, category, sizes, colors, active, image_url });
-    if (error) redirect("/shop/admin?erreur=" + encodeURIComponent(error.message));
+    await supabase.from("shop_items").insert(payload);
   }
 
   revalidatePath("/shop");
   revalidatePath("/shop/admin");
-  redirect("/shop/admin?ok=" + encodeURIComponent(id ? "Article modifié." : "Article ajouté."));
+  redirect("/shop/admin?ok=Article+enregistré");
 }
+
+// ── Admin : supprimer un article ─────────────────────────────────────────────
 
 export async function deleteItem(itemId: string) {
   await requireAdmin();
   const supabase = await createClient();
 
-  const { error } = await supabase.from("shop_items").update({ active: false }).eq("id", itemId);
-  if (error) redirect("/shop/admin?erreur=" + encodeURIComponent(error.message));
+  // Vérifier qu'il n'y a pas de commandes actives
+  const { data: active } = await supabase
+    .from("shop_orders")
+    .select("id")
+    .eq("item_id", itemId)
+    .not("status", "in", '("cancelled","delivered")')
+    .limit(1);
+
+  if (active && active.length > 0) {
+    redirect("/shop/admin?erreur=Cet+article+a+des+commandes+en+cours");
+  }
+
+  await supabase.from("shop_items").update({ active: false }).eq("id", itemId);
+
   revalidatePath("/shop");
   revalidatePath("/shop/admin");
-  redirect("/shop/admin?ok=" + encodeURIComponent("Article désactivé."));
+  redirect("/shop/admin?ok=Article+désactivé");
 }
