@@ -5,7 +5,7 @@ import { WeatherCard } from "@/components/WeatherCard";
 
 const CHARTS = [
   { title: "Aeroweb (Météo-France)", text: "TEMSI, WINTEM, cartes et images satellite", url: "https://aviation.meteo.fr/" },
-  { title: "SOFIA-Briefing", text: "Dossier de vol officiel : NOTAM, météo, SUP AIP", url: "https://sofia-briefing.aviation-civile.gouv.fr/" },
+  { title: "SOFIA-Briefing", text: "Dossier de vol officiel : NOTAM, météo, SUP AIP", url: "https://sofia-briefing.aviation-civile.gouv.fr/sofia/pages/homepage.html" },
   { title: "SIA", text: "Cartes VAC, AIP, complément aux cartes", url: "https://www.sia.aviation-civile.gouv.fr/" },
 ];
 
