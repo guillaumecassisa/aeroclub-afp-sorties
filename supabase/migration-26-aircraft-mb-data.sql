@@ -324,7 +324,7 @@ on conflict (aircraft_id) do update set
 -- Postes :
 --   Sièges avant      0.410 m  max 154 kg (2 places)
 --   Sièges arrière    1.190 m  max 154 kg (2 places)
---   Réservoir princ.  1.120 m  max 100 L  (fuel)
+--   Réservoir princ.  1.120 m  max 110 L  (fuel) — 78 kg / 0.72 = 108.3 L ≈ 110 L (fiche pesée confirme 79.2 kg = 110 L)
 --   Réservoir ailes   0.100 m  max 80 L   (fuel, dans l'aile → wing)
 --   Bagages           1.900 m  max 60 kg
 -- Domaine : trapèze (d'après diagramme manuel DR400)
@@ -347,7 +347,7 @@ select
   '[
     {"label":"Sièges avant",          "arm":0.410,"max":154},
     {"label":"Sièges arrière",        "arm":1.190,"max":154},
-    {"label":"Réservoir principal",   "arm":1.120,"max":100,"fuel":true},
+    {"label":"Réservoir principal",   "arm":1.120,"max":110,"fuel":true},
     {"label":"Réservoir ailes",       "arm":0.100,"max":80, "fuel":true,"wing":true},
     {"label":"Bagages",               "arm":1.900,"max":60}
   ]'::jsonb,
@@ -379,19 +379,23 @@ on conflict (aircraft_id) do update set
 -- -------------------------------------------------------------------------
 -- Bristell B23-915 (F-HUFA)
 --
--- Sources : Manuel de vol Bristell B23 + fiche de pesée F-HUFA
+-- Sources : Manuel de vol Bristell B23-915 (ADXC-73-003-AFM, Rév.B3, 24.11.2023)
+--           + fiche de pesée F-HUFA (BRM-211, 07.07.2022)
 -- MTOW : 750 kg (LSA)
+-- S/N : 0077
 -- Datum : flasque hélice (Propeller Flange)
--- Conversion %MAC → mètres : bras_m = 1.377 + (%MAC / 100) × 1.343
--- Réservoir : bras 1.600 m, capacité non disponible dans les pages extraites
---             (Section 2 Limitations absente) → fuel_capacity_l = null
--- Postes :
---   Pilote & Passager        2.085 m  pas de max (avion ASTM LSA)
---   Bagages derrière sièges  2.520 m  pas de max
---   Casiers aile             2.025 m  dans l'aile (wing)
---   Carburant                1.600 m  fuel (capacité à compléter depuis section 2 du manuel)
--- Domaine CG (converti depuis le graphique %MAC du POH) :
---   (1.713 m, 525 kg) → (1.793 m, 750 kg) → (1.834 m, 750 kg) → (1.847 m, 525 kg)
+-- Conversion %MAC → mètres : bras_m = MAC_LE + (%MAC/100) × MAC = 1.377 + (%MAC/100) × 1.343
+-- Réservoir (§2.13) : 2 réservoirs × 60 L = 120 L total ; utilisable 2×56 = 112 L
+--   Carburant approuvé : UL95/SP95, AVGAS UL91, AVGAS 100LL
+--   bras : 1.600 m (§6.5 — "FUEL weight = qty×0.72 kg/liter, arm 1.600")
+-- Postes (§6.5) :
+--   Pilote & Passager           2.085 m  max 2×120 kg (voir §6.4 ; min 55 kg pilote)
+--   Bagages derrière sièges     2.520 m  max 16 kg (lower 15 kg + upper 1 kg, §2.7)
+--   Casiers aile (wing lockers) 2.025 m  max 40 kg (2×20 kg/côté, §2.7) — dans l'aile
+--   Carburant                   1.600 m  max 120 L total (fuel)
+-- Domaine CG (§2.8 — graphique en %MAC converti en mètres) :
+--   %MAC 25%→34.5% (operating CG range)
+--   Points clés :  (1.713,530) (1.713,600) (1.753,660) (1.793,750) (1.834,750) (1.840,600) (1.834,530)
 -- -------------------------------------------------------------------------
 
 insert into public.aircraft_mb (
@@ -403,24 +407,27 @@ insert into public.aircraft_mb (
 )
 select
   a.id,
-  null,
-  469.5,            -- fiche de pesée F-HUFA
+  '0077',
+  469.5,            -- fiche de pesée F-HUFA (07.07.2022)
   800.8,            -- fiche de pesée F-HUFA  (en kg.m)
   750,
-  1.600, 0.72, null,   -- capacité réservoir : section 2 non extraite → à compléter
+  1.600, 0.72, 120,   -- §2.13 : 2×60 L = 120 L total
   '[
-    {"label":"Pilote & Passager",       "arm":2.085,"max":null},
-    {"label":"Bagages derrière sièges", "arm":2.520,"max":null},
-    {"label":"Casiers aile",            "arm":2.025,"max":null,"wing":true},
-    {"label":"Carburant",               "arm":1.600,"max":null,"fuel":true}
+    {"label":"Pilote & Passager",       "arm":2.085,"max":240},
+    {"label":"Bagages derrière sièges", "arm":2.520,"max":16},
+    {"label":"Casiers aile",            "arm":2.025,"max":40,"wing":true},
+    {"label":"Carburant",               "arm":1.600,"max":120,"fuel":true}
   ]'::jsonb,
   '[
-    {"arm":1.713,"mass":525},
+    {"arm":1.713,"mass":530},
+    {"arm":1.713,"mass":600},
+    {"arm":1.753,"mass":660},
     {"arm":1.793,"mass":750},
     {"arm":1.834,"mass":750},
-    {"arm":1.847,"mass":525}
+    {"arm":1.840,"mass":600},
+    {"arm":1.834,"mass":530}
   ]'::jsonb,
-  'Manuel de vol Bristell B23-915 + fiche de pesée F-HUFA — capacité réservoir à compléter (section 2)',
+  'Manuel de vol Bristell B23-915 (ADXC-73-003-AFM Rév.B3) + fiche de pesée F-HUFA (BRM-211 07.07.2022)',
   now()
 from public.aircraft a
 where a.registration = 'F-HUFA'
