@@ -42,7 +42,7 @@ function fmtDate(iso: string) {
 }
 
 // ─── Formulaire bandeau "Proposer un vol" ───────────────────────────────────
-function PublishBanner({ onPublished }: { onPublished?: () => void }) {
+function PublishBanner({ onPublished, clubAircraft }: { onPublished?: () => void; clubAircraft: { registration: string; model: string }[] }) {
   const [open, setOpen] = useState(false);
   const [dep, setDep] = useState("");
   const [arr, setArr] = useState("");
@@ -135,9 +135,16 @@ function PublishBanner({ onPublished }: { onPublished?: () => void }) {
             </label>
 
             {/* Avion */}
-            <label className="block w-28">
-              <span className="label">Immat.</span>
-              <input name="aircraft" maxLength={40} className="field uppercase" placeholder="F-HXAF" />
+            <label className="block w-40">
+              <span className="label">Avion</span>
+              <select name="aircraft" className="field" defaultValue="">
+                <option value="">— Non précisé —</option>
+                {clubAircraft.map((a) => (
+                  <option key={a.registration} value={a.registration}>
+                    {a.registration} · {a.model}
+                  </option>
+                ))}
+              </select>
             </label>
 
             {/* Commentaire */}
@@ -413,10 +420,12 @@ export function FlightBoard({
   flights,
   meId,
   admin,
+  clubAircraft,
 }: {
   flights: FlightShare[];
   meId: string;
   admin: boolean;
+  clubAircraft: { registration: string; model: string }[];
 }) {
   const [selected, setSelected] = useState<string | null>(
     flights.find((f) => f.status === "open")?.id ?? null,
@@ -430,7 +439,7 @@ export function FlightBoard({
   return (
     <div className="flex flex-col" style={{ height: "calc(100dvh - 120px)" }}>
       {/* ── Bandeau proposer un vol ── */}
-      <PublishBanner />
+      <PublishBanner clubAircraft={clubAircraft} />
 
       {/* ── Corps : carte + liste ── */}
       <div className="flex min-h-0 flex-1">
