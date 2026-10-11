@@ -71,12 +71,10 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   return (
     <>
       <Banner ok={sp.ok} erreur={sp.erreur} />
-      <h1 className="text-2xl font-bold tracking-tight text-navy-2">Shareflight</h1>
-      <p className="mb-4 text-sm text-muted">
-        Covoiturage aérien entre membres du club. Un pilote propose un vol et les autres membres peuvent s&apos;inscrire
-        comme passagers.
-      </p>
-      <FlightBoard flights={flights} meId={me.id} admin={me.role === "admin"} />
+      {/* FlightBoard prend toute la hauteur dispo — on annule le padding du layout */}
+      <div className="-mx-4 -my-6 -mb-10">
+        <FlightBoard flights={flights} meId={me.id} admin={me.role === "admin"} />
+      </div>
     </>
   );
 }
