@@ -10,13 +10,13 @@
 -- Sources : Manuel de vol PS-28 Cruiser (Czech Sport Aircraft)
 --           + fiches de pesée individuelles
 -- MTOW : 600 kg — MLW : 600 kg (avion LSA)
--- Datum : bord du nez de l'avion
+-- Datum : Rib #4 (nervure n°4) — d'après POH section 6.4
 -- Réservoir principal : 2 × 57 L (total 114 L), bras 0.180 m
 -- Postes (d'après tableau de chargement du POH) :
 --   Pilote           0.700 m  max 115 kg
 --   Passager         0.700 m  max 115 kg
 --   Bagages coffre   1.310 m  max 18 kg
---   Casiers d'aile   0.600 m  max 10 kg  (dans l'aile → exclus du MZFW)
+--   Casiers d'aile   0.600 m  max 20 kg  (10 kg par aile × 2, dans l'aile → exclus du MZFW)
 --   Carburant        0.180 m  max 114 L  (fuel, density 0.72)
 -- Domaine : rectangle 0.420–0.525 m × 400–600 kg
 -- -------------------------------------------------------------------------
@@ -40,7 +40,7 @@ select
     {"label":"Pilote",         "arm":0.700,"max":115},
     {"label":"Passager",       "arm":0.700,"max":115},
     {"label":"Bagages coffre", "arm":1.310,"max":18},
-    {"label":"Casiers aile",   "arm":0.600,"max":10, "wing":true},
+    {"label":"Casiers aile",   "arm":0.600,"max":20, "wing":true},
     {"label":"Carburant",      "arm":0.180,"max":114,"fuel":true}
   ]'::jsonb,
   '[
@@ -86,7 +86,7 @@ select
     {"label":"Pilote",         "arm":0.700,"max":115},
     {"label":"Passager",       "arm":0.700,"max":115},
     {"label":"Bagages coffre", "arm":1.310,"max":18},
-    {"label":"Casiers aile",   "arm":0.600,"max":10, "wing":true},
+    {"label":"Casiers aile",   "arm":0.600,"max":20, "wing":true},
     {"label":"Carburant",      "arm":0.180,"max":114,"fuel":true}
   ]'::jsonb,
   '[
@@ -132,7 +132,7 @@ select
     {"label":"Pilote",         "arm":0.700,"max":115},
     {"label":"Passager",       "arm":0.700,"max":115},
     {"label":"Bagages coffre", "arm":1.310,"max":18},
-    {"label":"Casiers aile",   "arm":0.600,"max":10, "wing":true},
+    {"label":"Casiers aile",   "arm":0.600,"max":20, "wing":true},
     {"label":"Carburant",      "arm":0.180,"max":114,"fuel":true}
   ]'::jsonb,
   '[
@@ -178,7 +178,7 @@ select
     {"label":"Pilote",         "arm":0.700,"max":115},
     {"label":"Passager",       "arm":0.700,"max":115},
     {"label":"Bagages coffre", "arm":1.310,"max":18},
-    {"label":"Casiers aile",   "arm":0.600,"max":10, "wing":true},
+    {"label":"Casiers aile",   "arm":0.600,"max":20, "wing":true},
     {"label":"Carburant",      "arm":0.180,"max":114,"fuel":true}
   ]'::jsonb,
   '[
@@ -224,7 +224,7 @@ select
     {"label":"Pilote",         "arm":0.700,"max":115},
     {"label":"Passager",       "arm":0.700,"max":115},
     {"label":"Bagages coffre", "arm":1.310,"max":18},
-    {"label":"Casiers aile",   "arm":0.600,"max":10, "wing":true},
+    {"label":"Casiers aile",   "arm":0.600,"max":20, "wing":true},
     {"label":"Carburant",      "arm":0.180,"max":114,"fuel":true}
   ]'::jsonb,
   '[
