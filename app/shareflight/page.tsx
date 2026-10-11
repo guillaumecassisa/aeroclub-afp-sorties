@@ -15,7 +15,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   const { data: aircraftRows } = await supabase
     .from("aircraft")
     .select("registration, model")
-    .is("archived_at", null)
+    .eq("active", true)
     .order("registration");
   const clubAircraft = (aircraftRows ?? []) as { registration: string; model: string }[];
 
