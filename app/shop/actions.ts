@@ -31,13 +31,12 @@ export async function placeOrder(formData: FormData) {
   if (!item) redirect("/shop?erreur=Article+introuvable");
   if (!item.active) redirect("/shop?erreur=Article+non+disponible");
 
-  // Vérifications
-  if (item.sizes && item.sizes.length > 0 && !size) {
-    redirect(`/shop?erreur=Veuillez+choisir+une+taille`);
-  }
-  if (item.colors && item.colors.length > 0 && !color) {
-    redirect(`/shop?erreur=Veuillez+choisir+une+couleur`);
-  }
+  // sizes/colors stored as CSV string — check if selection required
+  const hasSizes = item.sizes && item.sizes.trim().length > 0;
+  const hasColors = item.colors && item.colors.trim().length > 0;
+
+  if (hasSizes && !size) redirect(`/shop?erreur=Veuillez+choisir+une+taille`);
+  if (hasColors && !color) redirect(`/shop?erreur=Veuillez+choisir+une+couleur`);
 
   const itemName = item.name ?? "Article";
 
@@ -52,12 +51,10 @@ export async function placeOrder(formData: FormData) {
     note: note || null,
   });
 
-  console.log("[shop/placeOrder] insert error=", error);
-
   if (error) redirect(`/shop?erreur=${encodeURIComponent(error.message)}`);
 
   revalidatePath("/shop");
-  redirect("/shop?ok=Commande+enregistrée+✓+Le+trésorier+vous+contactera+pour+la+suite");
+  redirect("/shop?ok=Commande+enregistree+!+Le+tresorier+vous+contactera+pour+la+suite");
 }
 
 // ── Annuler ma commande ──────────────────────────────────────────────────────
@@ -76,7 +73,7 @@ export async function cancelOrder(orderId: string) {
   if (error) redirect("/shop?erreur=Impossible+d'annuler+cette+commande");
 
   revalidatePath("/shop");
-  redirect("/shop?ok=Commande+annulée");
+  redirect("/shop?ok=Commande+annulee");
 }
 
 // ── Admin : mettre à jour le statut d'une commande ──────────────────────────
@@ -88,7 +85,7 @@ export async function updateOrderStatus(orderId: string, status: string) {
   await supabase.from("shop_orders").update({ status }).eq("id", orderId);
 
   revalidatePath("/shop/admin");
-  redirect("/shop/admin?ok=Statut+mis+à+jour");
+  redirect("/shop/admin?ok=Statut+mis+a+jour");
 }
 
 // ── Admin : créer/modifier un article ───────────────────────────────────────
@@ -102,15 +99,12 @@ export async function upsertItem(formData: FormData) {
   const description = (formData.get("description") as string) || null;
   const price_str = (formData.get("price") as string).replace(",", ".");
   const price_cents = Math.round(parseFloat(price_str || "0") * 100);
-  const category = (formData.get("category") as string) || "vetement";
-  const sizesRaw = (formData.get("sizes") as string) || "";
-  const colorsRaw = (formData.get("colors") as string) || "";
+  const category = (formData.get("category") as string) || null;
+  // sizes/colors stored as CSV string
+  const sizes = (formData.get("sizes") as string) || null;
+  const colors = (formData.get("colors") as string) || null;
   const image_url = (formData.get("image_url") as string) || null;
-  const position = parseInt(formData.get("position") as string, 10) || 0;
-  const active = formData.get("active") === "on";
-
-  const sizes = sizesRaw.split(",").map((s) => s.trim()).filter(Boolean);
-  const colors = colorsRaw.split(",").map((c) => c.trim()).filter(Boolean);
+  const active = formData.get("active") === "true" || formData.get("active") === "on";
 
   if (!name) redirect("/shop/admin?erreur=Nom+requis");
 
@@ -119,10 +113,9 @@ export async function upsertItem(formData: FormData) {
     description,
     price_cents,
     category,
-    sizes: sizes.length ? sizes : null,
-    colors: colors.length ? colors : null,
+    sizes: sizes?.trim() || null,
+    colors: colors?.trim() || null,
     image_url,
-    position,
     active,
   };
 
@@ -134,7 +127,7 @@ export async function upsertItem(formData: FormData) {
 
   revalidatePath("/shop");
   revalidatePath("/shop/admin");
-  redirect("/shop/admin?ok=Article+enregistré");
+  redirect("/shop/admin?ok=Article+enregistre");
 }
 
 // ── Admin : supprimer un article ─────────────────────────────────────────────
@@ -159,5 +152,5 @@ export async function deleteItem(itemId: string) {
 
   revalidatePath("/shop");
   revalidatePath("/shop/admin");
-  redirect("/shop/admin?ok=Article+désactivé");
+  redirect("/shop/admin?ok=Article+desactive");
 }
