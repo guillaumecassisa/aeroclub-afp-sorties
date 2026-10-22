@@ -11,6 +11,8 @@ import { formatDate, formatTime, dayBadge } from "@/lib/dates";
 import { euros, currentMonthKey } from "@/lib/money";
 import { createAnnouncement, deleteAnnouncement } from "@/app/annonces/actions";
 import { SubmitButton } from "@/components/ui";
+import { QuizPopup } from "@/components/QuizPopup";
+import { submitQuizAnswer } from "@/app/quiz/actions";
 
 export const metadata: Metadata = { title: `Accueil — ${CLUB_NAME}` };
 export const dynamic = "force-dynamic";
@@ -111,6 +113,7 @@ export default async function Page({
   const KIND_ICON: Record<string, string> = { vol: "✈️", activite: "🏍️", evenement: "🥂" };
 
   const now = new Date();
+  const today = now.toISOString().slice(0, 10);
   const dateStr = now.toLocaleDateString("fr-FR", {
     timeZone: "Europe/Paris",
     weekday: "long",
@@ -119,9 +122,41 @@ export default async function Page({
     year: "numeric",
   });
 
+  // Question du jour : sélection déterministe par date
+  const { data: allQuestions } = approved && profile
+    ? await supabase
+        .from("quiz_questions")
+        .select("id, question, option_a, option_b, option_c, option_d, correct, explanation, category")
+        .eq("active", true)
+        .order("id")
+    : { data: [] };
+
+  const totalQ = allQuestions?.length ?? 0;
+  const dayOfYear = Math.floor((now.getTime() - Date.UTC(now.getUTCFullYear(), 0, 0)) / 86400000);
+  const dailyQuestion = totalQ > 0 ? allQuestions![dayOfYear % totalQ] : null;
+
+  const { data: todayAnswer } = dailyQuestion && profile
+    ? await supabase
+        .from("quiz_answers")
+        .select("id")
+        .eq("user_id", profile.id)
+        .eq("answered_on", today)
+        .maybeSingle()
+    : { data: null };
+  const alreadyAnswered = !!todayAnswer;
+
   return (
     <>
       <Banner ok={sp.ok} erreur={sp.erreur} />
+
+      {/* Quiz du jour */}
+      {dailyQuestion && profile && (
+        <QuizPopup
+          question={dailyQuestion}
+          alreadyAnswered={alreadyAnswered}
+          submitAnswer={submitQuizAnswer}
+        />
+      )}
 
       {/* Hero */}
       <div className="mb-6 overflow-hidden rounded-2xl bg-navy-2 px-6 py-6 text-white">
