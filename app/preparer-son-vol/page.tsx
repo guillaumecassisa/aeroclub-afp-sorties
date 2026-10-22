@@ -32,7 +32,7 @@ export default async function Page() {
     {
       title: "Performances",
       description: "Distances de décollage et d'atterrissage selon les conditions.",
-            href: "/performances",,
+            href: "/performances",
       icon: "📐",
     },
   ];
