@@ -1,35 +1,28 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
-import { requireMember, canOrganize, isStaff } from "@/lib/auth";
+import { requireMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { isoToParisLocal } from "@/lib/dates";
 import { OutingForm } from "@/components/OutingForm";
-import type { Aircraft } from "@/lib/types";
+import type { Aircraft, OutingDetail } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Modifier la sortie" };
+export const metadata: Metadata = { title: "Modifier l'événement" };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const me = await requireMember();
+  await requireMember();
+  if (!UUID.test(id)) notFound();
   const supabase = await createClient();
 
-  const { data: outing } = await supabase
-    .from("outings")
-    .select("*, instructor:instructor_id(id)")
-    .eq("id", id)
-    .single();
+  const { data } = await supabase.rpc("get_outing", { p_id: id });
+  if (!data) notFound();
+  const o = data as OutingDetail;
+  if (!o.can_edit || o.status === "cancelled") redirect(`/sorties/${id}`);
 
-  if (!outing) notFound();
-  const canEdit = isStaff(me) || outing.instructor?.id === me.id;
-  if (!canEdit || !canOrganize(me)) redirect(`/sorties/${id}`);
-
-  const { data: aircraftRaw } = await supabase
-    .from("outing_aircraft")
-    .select("aircraft_id, position")
-    .eq("outing_id", id)
-    .order("position");
-
-  const { data: fleet } = await supabase.from("aircraft").select("*").eq("active", true).order("registration");
+  const { data: fleet } = await supabase.from("aircraft").select("*").eq("active", true).order("type").order("registration");
+  const registered = (o.kind ?? "vol") === "vol" ? o.aircraft.reduce((s, a) => s + a.occupants.length, 0) : (o.participants ?? []).length;
 
   return (
     <>
@@ -38,17 +31,18 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         fleet={(fleet ?? []) as Aircraft[]}
         initial={{
           id,
-          kind: outing.kind ?? "vol",
-          title: outing.title,
-          destination: outing.destination ?? "",
-          meeting_point: outing.meeting_point ?? "",
-          description: outing.description ?? "",
-          departure_at: isoToParisLocal(outing.departure_at),
-          return_at: isoToParisLocal(outing.return_at),
-          registration_deadline: isoToParisLocal(outing.registration_deadline),
-          aircraft: (aircraftRaw ?? []).map((r) => r.aircraft_id),
-          instructor_aircraft: outing.instructor_aircraft_id,
-          max_participants: outing.max_participants,
+          kind: o.kind ?? "vol",
+          title: o.title,
+          destination: o.destination ?? "",
+          meeting_point: o.meeting_point ?? "",
+          description: o.description ?? "",
+          departure_at: isoToParisLocal(o.departure_at),
+          return_at: isoToParisLocal(o.return_at),
+          registration_deadline: isoToParisLocal(o.registration_deadline),
+          aircraft: o.aircraft.map((a) => a.id),
+          instructor_aircraft: o.instructor_aircraft_id,
+          max_participants: o.max_participants,
+          registered_count: registered,
         }}
         submitLabel="Enregistrer"
       />

@@ -37,39 +37,19 @@ export default async function QuizPage() {
   const profile = await requireMember();
   const supabase = await createClient();
 
-  const { data: leaderRaw } = await supabase
-    .from("quiz_answers")
-    .select("user_id, is_correct, profiles(full_name, avatar_url)")
-    .order("answered_on", { ascending: false });
-
-  const byUser = new Map<string, LeaderRow>();
-  for (const row of leaderRaw ?? []) {
-    const uid = row.user_id;
-    if (!byUser.has(uid)) {
-            const p = (row as unknown as { profiles?: { full_name: string | null; avatar_url: string | null } | null }).profiles;
-      byUser.set(uid, {
-        user_id: uid,
-        full_name: p?.full_name ?? null,
-        avatar_url: p?.avatar_url ?? null,
-        total: 0,
-        correct: 0,
-      });
-    }
-    const entry = byUser.get(uid)!;
-    entry.total++;
-    if (row.is_correct) entry.correct++;
-  }
-
-  const leaderboard = Array.from(byUser.values())
-    .sort((a, b) => b.correct - a.correct || b.total - a.total)
-    .slice(0, 50);
-
-  const { data: myAnswers } = await supabase
-    .from("quiz_answers")
-    .select("answered_on, is_correct, question_id, quiz_questions(question, category, correct)")
-    .eq("user_id", profile.id)
-    .order("answered_on", { ascending: false })
-    .limit(30);
+  // Classement et historique calculés par la base (les noms des autres membres n'y sont pas lisibles directement)
+  const [{ data: leaderRaw }, { data: historyRaw }] = await Promise.all([
+    supabase.rpc("quiz_leaderboard"),
+    supabase.rpc("quiz_my_history"),
+  ]);
+  const leaderboard = (leaderRaw ?? []) as LeaderRow[];
+  const myAnswers = (historyRaw ?? []) as {
+    question_id: number;
+    answered_on: string;
+    is_correct: boolean;
+    question: string;
+    category: string | null;
+  }[];
 
   const myTotal = myAnswers?.length ?? 0;
   const myCorrect = myAnswers?.filter((a) => a.is_correct).length ?? 0;
@@ -156,15 +136,14 @@ export default async function QuizPage() {
         <div>
           <h2 className="text-lg font-semibold text-navy-2 mb-3">📅 Mes réponses récentes</h2>
           <div className="divide-y divide-line rounded-2xl border border-line overflow-hidden">
-            {myAnswers?.map((a) => {
-                            const q = (a as unknown as { quiz_questions?: { question: string; category: string; correct: string } | null }).quiz_questions;
+            {myAnswers.map((a) => {
               return (
                 <div key={`${a.question_id}-${a.answered_on}`} className="flex items-start gap-3 px-4 py-3 bg-white">
                   <span className="shrink-0 text-base mt-0.5">{a.is_correct ? "✅" : "❌"}</span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-sm text-ink leading-snug">{q?.question ?? "—"}</div>
+                    <div className="text-sm text-ink leading-snug">{a.question}</div>
                     <div className="text-xs text-muted mt-0.5">
-                      {CATEGORY_LABELS[q?.category ?? ""] ?? ""} · {a.answered_on}
+                      {CATEGORY_LABELS[a.category ?? ""] ?? ""} · {a.answered_on}
                     </div>
                   </div>
                 </div>

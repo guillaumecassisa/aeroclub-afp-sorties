@@ -30,36 +30,12 @@ export default async function StatsPage({
     months.unshift(shiftMonth(now, -i));
   }
 
-  // ── Bar : consommations par mois ──────────────────────────────────────────
-  const { data: barRaw } = await supabase
-    .from("bar_consumptions")
-    .select("created_at, unit_price_cents, quantity")
-    .gte("created_at", `${months[0]}-01`)
-    .not("unit_price_cents", "is", null);
-
-  // ── Shop : commandes livrées par mois ─────────────────────────────────────
-  const { data: shopRaw } = await supabase
-    .from("shop_orders")
-    .select("created_at, price_cents, quantity")
-    .eq("status", "delivered")
-    .gte("created_at", `${months[0]}-01`);
-
-  // Agréger par mois
-  function monthKey(dateStr: string) {
-    return dateStr.slice(0, 7); // "2026-10"
-  }
-
-  const barByMonth: Record<string, number> = {};
-  for (const row of barRaw ?? []) {
-    const k = monthKey(row.created_at);
-    barByMonth[k] = (barByMonth[k] ?? 0) + (row.unit_price_cents ?? 0) * (row.quantity ?? 1);
-  }
-
-  const shopByMonth: Record<string, number> = {};
-  for (const row of shopRaw ?? []) {
-    const k = monthKey(row.created_at);
-    shopByMonth[k] = (shopByMonth[k] ?? 0) + (row.price_cents ?? 0) * (row.quantity ?? 1);
-  }
+  // Chiffres calculés par la base (réservé admin / trésorier) : bar = consommations des produits du bar,
+  // shop = commandes livrées (leur débit sur l'ardoise n'est pas recompté côté bar)
+  const { data: statsRaw, error } = await supabase.rpc("revenue_stats", { p_months: NB_MONTHS });
+  const rows = (statsRaw ?? []) as { month: string; bar: number; shop: number }[];
+  const barByMonth: Record<string, number> = Object.fromEntries(rows.map((r) => [r.month, Number(r.bar)]));
+  const shopByMonth: Record<string, number> = Object.fromEntries(rows.map((r) => [r.month, Number(r.shop)]));
 
   const totalBar = Object.values(barByMonth).reduce((a, b) => a + b, 0);
   const totalShop = Object.values(shopByMonth).reduce((a, b) => a + b, 0);
@@ -72,7 +48,7 @@ export default async function StatsPage({
 
   return (
     <>
-      <Banner ok={sp.ok} erreur={sp.erreur} />
+      <Banner ok={sp.ok} erreur={sp.erreur ?? error?.message} />
 
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-navy-2">📊 Stats – Bar & Shop</h1>

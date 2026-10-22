@@ -1,23 +1,33 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { requireMember, canOrganize } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
 import { OutingForm } from "@/components/OutingForm";
 import type { Aircraft } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Nouvelle sortie" };
+export const metadata: Metadata = { title: "Nouvel événement" };
 
 export default async function Page() {
   const me = await requireMember();
-  if (!canOrganize(me)) redirect("/?erreur=" + encodeURIComponent("Réservé aux instructeurs et fonctions du club."));
+  const organizer = canOrganize(me);
 
   const supabase = await createClient();
-  const { data } = await supabase.from("aircraft").select("*").eq("active", true).order("registration");
+  const { data } = await supabase.from("aircraft").select("*").eq("active", true).order("type").order("registration");
   const fleet = (data ?? []) as Aircraft[];
 
   return (
     <>
-      <h1 className="mb-6 text-2xl font-bold tracking-tight text-navy-2">Créer un événement</h1>
+      <Link href="/sorties" className="mb-1 inline-flex items-center gap-1 text-sm text-muted hover:text-navy-2">
+        ← Événements
+      </Link>
+      <h1 className="mb-2 text-2xl font-bold tracking-tight text-navy-2">
+        {organizer ? "Créer un événement" : "Proposer un événement"}
+      </h1>
+      {!organizer && (
+        <p className="mb-6 text-sm text-muted">
+          Votre proposition sera publiée après validation par un instructeur ou un administrateur.
+        </p>
+      )}
       <OutingForm
         fleet={fleet}
         initial={{
@@ -31,7 +41,7 @@ export default async function Page() {
           aircraft: [],
           instructor_aircraft: null,
         }}
-        submitLabel="Créer"
+        submitLabel={organizer ? "Créer" : "Envoyer la proposition"}
       />
     </>
   );

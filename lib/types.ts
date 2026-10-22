@@ -21,6 +21,7 @@ export type Profile = {
   is_treasurer?: boolean;
   is_secretary?: boolean;
   is_maintenance?: boolean;
+  is_board?: boolean;
   is_instructor?: boolean;
   notify_events?: boolean;
   show_phone?: boolean;

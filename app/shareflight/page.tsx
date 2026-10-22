@@ -19,18 +19,20 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
     .order("registration");
   const clubAircraft = (aircraftRows ?? []) as { registration: string; model: string }[];
 
-  // Charger les vols + passagers inscrits + noms via join profiles
+  // Noms et photos des membres : via l'annuaire (un membre ne peut pas lire les fiches des autres)
+  const { data: dir } = await supabase.rpc("member_directory");
+  const people = new Map(
+    ((dir ?? []) as { id: string; full_name: string; avatar_url: string | null }[]).map((m) => [m.id, m]),
+  );
+
+  // Charger les vols + passagers inscrits
   const { data } = await supabase
     .from("flight_shares")
     .select(
       `id, pilot_id, dep_icao, dep_name, dep_lat, dep_lon,
        arr_icao, arr_name, arr_lat, arr_lon,
        flight_date, seats, aircraft, comment, status,
-       profiles!pilot_id ( full_name, avatar_url ),
-       flight_share_seats (
-         member_id,
-         profiles!member_id ( full_name )
-       )`,
+       flight_share_seats ( member_id )`,
     )
     .order("flight_date", { ascending: true })
     .order("created_at", { ascending: false });
@@ -46,18 +48,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
       aircraft: string | null;
       comment: string | null;
       status: "open" | "closed" | "cancelled";
-      profiles: { full_name: string | null; avatar_url: string | null } | null;
-      flight_share_seats: { member_id: string; profiles: { full_name: string | null } | null }[];
+      flight_share_seats: { member_id: string }[];
     };
     const passengers = (row.flight_share_seats ?? []).map((s) => ({
       member_id: s.member_id,
-      member_name: s.profiles?.full_name ?? "Membre",
+      member_name: people.get(s.member_id)?.full_name ?? "Membre",
     }));
     return {
       id: row.id,
       pilot_id: row.pilot_id,
-      pilot_name: row.profiles?.full_name ?? "Pilote",
-      pilot_avatar: row.profiles?.avatar_url ?? null,
+      pilot_name: people.get(row.pilot_id)?.full_name ?? "Pilote",
+      pilot_avatar: people.get(row.pilot_id)?.avatar_url ?? null,
       dep_icao: row.dep_icao,
       dep_name: row.dep_name,
       dep_lat: Number(row.dep_lat),

@@ -42,6 +42,7 @@ export function canOrganize(p: Profile | null) {
   return (
     p.role === "instructor" ||
     p.role === "admin" ||
+    !!p.is_board ||
     !!p.is_treasurer ||
     !!p.is_secretary ||
     !!p.is_maintenance

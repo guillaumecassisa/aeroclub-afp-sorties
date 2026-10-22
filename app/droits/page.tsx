@@ -70,9 +70,17 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
       <Banner ok={sp.ok} erreur={sp.erreur} />
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h1 className="text-2xl font-bold tracking-tight text-navy-2">Gestion des droits</h1>
-        <Link href="/journal" className="text-sm font-semibold text-sky hover:underline">
-          Journal des modifications →
-        </Link>
+        <div className="flex flex-wrap gap-4">
+          <Link href="/infos-club" className="text-sm font-semibold text-sky hover:underline">
+            Informations du club →
+          </Link>
+          <Link href="/liens" className="text-sm font-semibold text-sky hover:underline">
+            Liens utiles →
+          </Link>
+          <Link href="/journal" className="text-sm font-semibold text-sky hover:underline">
+            Journal des modifications →
+          </Link>
+        </div>
       </div>
       <p className="mb-5 text-sm text-muted">
         Tout le monde est <strong className="text-ink">membre</strong>. Les droits supplémentaires sont des{" "}

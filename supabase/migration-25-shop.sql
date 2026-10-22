@@ -75,12 +75,21 @@ create trigger touch_shop_order
   for each row execute function public.touch_shop_order();
 
 -- Quelques articles d'exemple (à adapter / supprimer)
-insert into public.shop_items (name, description, price_cents, category, sizes, colors, position) values
+-- (seulement si le catalogue est vide, pour pouvoir relancer ce fichier sans créer de doublons)
+insert into public.shop_items (name, description, price_cents, category, sizes, colors, position)
+select * from (values
   ('T-shirt club', 'T-shirt coton 100% aux couleurs du club, logo brodé au cœur', 2500, 'Vêtements', 'XS,S,M,L,XL,XXL', 'Blanc,Marine', 1),
   ('Polaire softshell', 'Veste softshell légère avec logo club, idéale pour les briefings sur le tarmac', 5500, 'Vêtements', 'S,M,L,XL,XXL', 'Marine,Gris', 2),
   ('Casquette brodée', 'Casquette ajustable avec logo club brodé', 2000, 'Accessoires', null, 'Marine,Blanc', 3),
   ('Mug "Pilote"', 'Mug céramique 350 ml, motif avion et indicatif LFMA', 1200, 'Accessoires', null, 'Blanc', 4),
   ('Sticker pack', 'Pack de 5 stickers vinyle : logo club, LFMA, avions de la flotte…', 500, 'Accessoires', null, null, 5)
-on conflict do nothing;
+) as v(name, description, price_cents, category, sizes, colors, position)
+where not exists (select 1 from public.shop_items);
+
+-- Colonnes ajoutées depuis (nom et prix figés à la commande, débit de l'ardoise)
+alter table public.shop_orders
+  add column if not exists item_name       text,
+  add column if not exists price_cents     int,
+  add column if not exists ardoise_charged boolean not null default false;
 
 notify pgrst, 'reload schema';

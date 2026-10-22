@@ -2,22 +2,26 @@
 
 import { useState, useEffect } from "react";
 
-type Question = {
+/** Question du jour telle que renvoyée par la base : la bonne réponse n'y figure qu'après avoir répondu. */
+export type DailyQuestion = {
   id: number;
   question: string;
   option_a: string;
   option_b: string;
   option_c: string;
   option_d: string;
-  correct: string;
-  explanation: string | null;
   category: string | null;
+  already_answered: boolean;
+  correct: string | null;
+  explanation: string | null;
 };
 
+type Result = { correct: boolean; answer: string; explanation: string | null; error?: string };
+
 type Props = {
-  question: Question;
+  question: DailyQuestion;
   alreadyAnswered: boolean;
-  submitAnswer: (questionId: number, answer: string) => Promise<{ correct: boolean }>;
+  submitAnswer: (questionId: number, answer: string) => Promise<Result>;
 };
 
 const OPTIONS = ["a", "b", "c", "d"] as const;
@@ -25,10 +29,10 @@ const OPTIONS = ["a", "b", "c", "d"] as const;
 export function QuizPopup({ question, alreadyAnswered, submitAnswer }: Props) {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string | null>(null);
-  const [result, setResult] = useState<{ correct: boolean } | null>(null);
+  const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Paris" }).format(new Date());
   const dismissKey = `quiz_dismissed_${today}`;
 
   useEffect(() => {
@@ -51,6 +55,7 @@ export function QuizPopup({ question, alreadyAnswered, submitAnswer }: Props) {
     setLoading(true);
     try {
       const res = await submitAnswer(question.id, opt);
+      if (res.error) setSelected(null);
       setResult(res);
     } finally {
       setLoading(false);
@@ -91,14 +96,22 @@ export function QuizPopup({ question, alreadyAnswered, submitAnswer }: Props) {
           <p className="mb-4 text-sm font-medium text-ink leading-snug">{question.question}</p>
 
           {alreadyAnswered && !result ? (
-            <p className="text-sm text-muted italic">Tu as déjà répondu aujourd'hui. Reviens demain !</p>
+            <div className="space-y-2 text-sm">
+              <p className="text-muted italic">Tu as déjà répondu aujourd&apos;hui. Reviens demain !</p>
+              {question.correct && (
+                <p className="text-ink">
+                  Bonne réponse : <strong>{question.correct.toUpperCase()}. {optionLabel[question.correct]}</strong>
+                </p>
+              )}
+              {question.explanation && <p className="text-xs text-muted">{question.explanation}</p>}
+            </div>
           ) : (
             <div className="space-y-2">
               {OPTIONS.map((opt) => {
                 const isSelected = selected === opt;
-                const isCorrect = question.correct === opt;
+                const isCorrect = result?.answer === opt;
                 let cls = "w-full rounded-xl border px-3 py-2 text-left text-sm transition ";
-                if (!selected) {
+                if (!selected || !result) {
                   cls += "border-line hover:border-sky-400 hover:bg-sky-soft";
                 } else if (isCorrect) {
                   cls += "border-emerald-400 bg-emerald-50 font-semibold text-emerald-700";
@@ -116,10 +129,11 @@ export function QuizPopup({ question, alreadyAnswered, submitAnswer }: Props) {
             </div>
           )}
 
-          {result && (
+          {result?.error && <p className="mt-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{result.error}</p>}
+          {result && !result.error && (
             <div className={`mt-3 rounded-xl p-3 text-sm ${result.correct ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
               <p className="font-semibold">{result.correct ? "✅ Bonne réponse !" : "❌ Raté !"}</p>
-              {question.explanation && <p className="mt-1 text-xs opacity-80">{question.explanation}</p>}
+              {result.explanation && <p className="mt-1 text-xs opacity-80">{result.explanation}</p>}
               <a href="/quiz" className="mt-2 block text-xs font-medium underline opacity-70 hover:opacity-100">
                 Voir le classement →
               </a>

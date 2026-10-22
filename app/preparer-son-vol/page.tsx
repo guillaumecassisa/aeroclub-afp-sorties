@@ -1,11 +1,27 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { requireMember } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Préparer son vol" };
 
 export default async function Page() {
   await requireMember();
+  const supabase = await createClient();
+  const { data: linksRaw } = await supabase
+    .from("club_links")
+    .select("id, section, title, subtitle, url, icon")
+    .order("section")
+    .order("position")
+    .order("title");
+  const clubLinks = (linksRaw ?? []) as {
+    id: string;
+    section: string;
+    title: string;
+    subtitle: string | null;
+    url: string;
+    icon: string | null;
+  }[];
 
   const externalTools = [
     {
@@ -117,6 +133,28 @@ export default async function Page() {
               ))}
             </div>
           </div>
+          {clubLinks.length > 0 && (
+            <div>
+              <h2 className="mb-3 text-lg font-bold tracking-tight text-navy-2">Liens utiles</h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {clubLinks.map((l) => (
+                  <a
+                    key={l.id}
+                    href={l.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="card flex items-start gap-3 p-4 transition hover:shadow-md"
+                  >
+                    <span className="text-2xl">{l.icon || "🔗"}</span>
+                    <div>
+                      <p className="font-semibold text-navy-2">{l.title}</p>
+                      {l.subtitle && <p className="mt-0.5 text-xs text-muted">{l.subtitle}</p>}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

@@ -1,4 +1,5 @@
--- Mise à jour complète (n°2 + n°3 + n°4) : peut être exécutée même si une partie a déjà été passée.
+-- Mise à jour complète (n°2 à n°28) : peut être exécutée même si une partie a déjà été passée.
+-- Elle ne contient aucune commande \i : elle se colle telle quelle dans Supabase > SQL Editor.
 -- =====================================================================
 --  Mise à jour n°2 : photo de profil, coordonnées, avions « lâchés »
 --  À exécuter une fois dans Supabase > SQL Editor > New query > Run.
@@ -2838,12 +2839,1350 @@ notify pgrst, 'reload schema';
 -- =====================================================================
 --  Mise à jour n°25 : instructeur référent pour les sorties proposées
 -- =====================================================================
-\i supabase/migration-25-instructeur-referent.sql
+-- =====================================================================
+--  Mise à jour n°25 : instructeur référent + alignement sur la base en service
+--  - Ajoute la colonne `referent_instructor_id` sur `outings` (réservée pour
+--    un usage futur : la validation d'une proposition ne la renseigne pas).
+--  - Reprend les versions de get_outing() et move_crew() réellement en
+--    service : poids lu sur pilot_weights.updated_at, et contrôle du lâcher
+--    (une personne non lâchée sur le type ne peut monter dans un avion que
+--    si un instructeur est à bord).
+--  La version précédente de ce fichier ne pouvait pas s'exécuter (rôle « ca »
+--  inexistant, colonne weighed_at inexistante) : elle est remplacée.
+--  À exécuter une fois dans Supabase > SQL Editor > New query > Run.
+-- =====================================================================
+
+alter table public.outings
+  add column if not exists referent_instructor_id uuid references public.profiles(id);
+
+CREATE OR REPLACE FUNCTION public.get_outing(p_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_uid   uuid := auth.uid();
+  v_staff boolean := public.is_staff();
+  v_row   public.outings;
+  v_org   public.profiles;
+  v_kind  text;
+  v_ac    jsonb;
+  v_wait  jsonb;
+  v_part  jsonb;
+  v_mine  jsonb;
+  v_org_w numeric;
+begin
+  select * into v_row from public.outings where id = p_id;
+  if not found then return null; end if;
+
+  v_kind := coalesce(v_row.kind, 'vol');
+
+  if v_row.approval <> 'approved' and v_row.status <> 'cancelled' then
+    if not (v_staff or v_row.instructor_id = v_uid) then return null; end if;
+  end if;
+  if v_row.status = 'cancelled' then
+    if not (v_staff or v_row.instructor_id = v_uid
+            or exists (select 1 from public.registrations where outing_id = p_id and user_id = v_uid)) then
+      return null;
+    end if;
+  end if;
+
+  select * into v_org from public.profiles where id = v_row.instructor_id;
+
+  if v_row.instructor_id = v_uid then
+    select weight_kg into v_org_w from public.pilot_weights where user_id = v_uid order by updated_at desc limit 1;
+  end if;
+
+  if v_kind = 'vol' then
+    select coalesce(jsonb_agg(ac_data order by ac_reg), '[]') into v_ac
+    from (
+      select
+        a.registration as ac_reg,
+        jsonb_build_object(
+          'id', a.id,
+          'registration', a.registration,
+          'model', a.model,
+          'type', a.type,
+          'seats', a.seats,
+          'instructor_onboard', v_row.instructor_aircraft_id = a.id,
+          'capacity', greatest(a.seats - case when v_row.instructor_aircraft_id = a.id then 1 else 0 end, 0),
+          'occupants', coalesce((
+            select jsonb_agg(jsonb_build_object(
+              'registration_id', r.id,
+              'user_id', r.user_id,
+              'full_name', p.full_name,
+              'avatar_url', p.avatar_url,
+              'released', exists (
+                select 1 from public.pilot_types pt
+                 where pt.user_id = r.user_id and pt.aircraft_type = a.type
+              ),
+              'phone', case when v_staff or v_row.instructor_id = v_uid then p.phone end,
+              'weight_kg', case when v_row.instructor_id = v_uid then pw.weight_kg end
+            ) order by r.created_at)
+            from public.registrations r
+            join public.profiles p on p.id = r.user_id
+            left join public.pilot_weights pw on pw.user_id = r.user_id
+              and pw.updated_at = (select max(updated_at) from public.pilot_weights where user_id = r.user_id)
+            where r.outing_id = p_id and r.status = 'confirmed' and r.aircraft_id = a.id
+          ), '[]')
+        ) as ac_data
+      from public.outing_aircraft oa
+      join public.aircraft a on a.id = oa.aircraft_id
+      where oa.outing_id = p_id
+    ) sub;
+  else
+    v_ac := '[]';
+  end if;
+
+  select coalesce(jsonb_agg(w order by w_created), '[]') into v_wait
+  from (
+    select jsonb_build_object(
+      'registration_id', r.id,
+      'user_id', r.user_id,
+      'full_name', p.full_name,
+      'avatar_url', p.avatar_url,
+      'released', false,
+      'phone', case when v_staff or v_row.instructor_id = v_uid then p.phone end,
+      'weight_kg', case when v_row.instructor_id = v_uid then pw.weight_kg end,
+      'position', row_number() over (order by r.created_at)
+    ) as w,
+    r.created_at as w_created
+    from public.registrations r
+    join public.profiles p on p.id = r.user_id
+    left join public.pilot_weights pw on pw.user_id = r.user_id
+      and pw.updated_at = (select max(updated_at) from public.pilot_weights where user_id = r.user_id)
+    where r.outing_id = p_id and r.status = 'waitlist'
+  ) sub;
+
+  if v_kind <> 'vol' then
+    select coalesce(jsonb_agg(jsonb_build_object(
+      'registration_id', r.id,
+      'user_id', r.user_id,
+      'full_name', p.full_name,
+      'avatar_url', p.avatar_url,
+      'released', false,
+      'phone', case when v_staff or v_row.instructor_id = v_uid then p.phone end
+    ) order by r.created_at), '[]') into v_part
+    from public.registrations r
+    join public.profiles p on p.id = r.user_id
+    where r.outing_id = p_id and r.status = 'confirmed';
+  else
+    v_part := '[]';
+  end if;
+
+  select jsonb_build_object('id', r.id, 'status', r.status, 'aircraft_id', r.aircraft_id) into v_mine
+  from public.registrations r
+  where r.outing_id = p_id and r.user_id = v_uid
+  limit 1;
+
+  return jsonb_build_object(
+    'id',                    v_row.id,
+    'title',                 v_row.title,
+    'destination',           v_row.destination,
+    'description',           v_row.description,
+    'meeting_point',         v_row.meeting_point,
+    'departure_at',          v_row.departure_at,
+    'return_at',             v_row.return_at,
+    'registration_deadline', v_row.registration_deadline,
+    'max_participants',      v_row.max_participants,
+    'kind',                  v_kind,
+    'status',                v_row.status,
+    'instructor_aircraft_id',v_row.instructor_aircraft_id,
+    'instructor', jsonb_build_object(
+      'id',          v_org.id,
+      'full_name',   v_org.full_name,
+      'phone',       case when v_staff or v_row.instructor_id = v_uid then v_org.phone end,
+      'avatar_url',  v_org.avatar_url
+    ),
+    'can_manage',            v_staff,
+    'is_organizer',          v_row.instructor_id = v_uid,
+    'organizer_weight_kg',   v_org_w,
+    'approval',              v_row.approval,
+    'rejection_reason',      v_row.rejection_reason,
+    'can_edit',              v_staff or (v_row.instructor_id = v_uid and v_row.approval <> 'approved'),
+    'aircraft',              v_ac,
+    'waitlist',              v_wait,
+    'participants',          v_part,
+    'my_registration',       v_mine
+  );
+end;
+$function$
+;
+
+CREATE OR REPLACE FUNCTION public.move_crew(p_outing uuid, p_who text, p_aircraft uuid, p_with text DEFAULT NULL::text)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_uid           uuid := auth.uid();
+  v_outing        public.outings;
+  v_from          uuid;
+  v_reg           public.registrations;
+  v_other         public.registrations;
+  v_cap           int;
+  v_used          int;
+  v_person_uid    uuid;
+  v_ac_type       text;
+  v_nom           text;
+  v_has_instructor boolean;
+  v_is_instructor  boolean;
+begin
+  if v_uid is null then raise exception 'Vous devez être connecté.'; end if;
+  if not public.is_approved() then raise exception 'Votre compte n''est pas encore validé.'; end if;
+
+  select * into v_outing from public.outings where id = p_outing for update;
+  if not found then raise exception 'Sortie introuvable.'; end if;
+  if not (public.can_organize() or v_outing.instructor_id = v_uid) then
+    raise exception 'Seul un organisateur peut répartir les équipages.';
+  end if;
+  if v_outing.status = 'cancelled' then raise exception 'Cette sortie est annulée.'; end if;
+  if coalesce(v_outing.kind, 'vol') <> 'vol' then raise exception 'Cet événement n''a pas d''avions.'; end if;
+  if not exists (select 1 from public.outing_aircraft where outing_id = p_outing and aircraft_id = p_aircraft) then
+    raise exception 'Cet avion ne fait pas partie de la sortie.';
+  end if;
+
+  if p_who = 'organizer' then
+    if v_outing.instructor_aircraft_id is null then raise exception 'L''organisateur n''est pas à bord.'; end if;
+    v_from := v_outing.instructor_aircraft_id;
+  else
+    select * into v_reg from public.registrations
+     where id = p_who::uuid and outing_id = p_outing and status = 'confirmed' for update;
+    if not found then raise exception 'Cette personne n''a pas de place confirmée dans cette sortie.'; end if;
+    v_from := v_reg.aircraft_id;
+  end if;
+  if v_from = p_aircraft then return; end if;
+
+  if p_who <> 'organizer' then
+    v_person_uid := v_reg.user_id;
+    select a.type into v_ac_type from public.aircraft a where a.id = p_aircraft;
+    select coalesce(pr.is_instructor, false) into v_is_instructor
+      from public.profiles pr where pr.id = v_person_uid;
+    if not v_is_instructor then
+      v_has_instructor := (v_outing.instructor_aircraft_id = p_aircraft)
+        or exists (
+          select 1 from public.registrations r
+          join public.profiles pr on pr.id = r.user_id
+          where r.outing_id = p_outing
+            and r.status = 'confirmed'
+            and r.aircraft_id = p_aircraft
+            and pr.is_instructor = true
+        );
+      if v_ac_type is not null and not v_has_instructor then
+        if not exists (
+          select 1 from public.pilot_types pt
+          where pt.user_id = v_person_uid and pt.aircraft_type = v_ac_type
+        ) then
+          select pr.full_name into v_nom from public.profiles pr where pr.id = v_person_uid;
+          raise exception '% n''est pas lâché(e) sur % — déplacement refusé.', v_nom, v_ac_type;
+        end if;
+      end if;
+    end if;
+  end if;
+
+  if p_with is null then
+    select greatest(a.seats - case when v_outing.instructor_aircraft_id = a.id then 1 else 0 end, 0)
+      into v_cap from public.aircraft a where a.id = p_aircraft;
+    select count(*) into v_used from public.registrations
+     where outing_id = p_outing and status = 'confirmed' and aircraft_id = p_aircraft;
+    if p_who = 'organizer' then v_cap := v_cap - 1; end if;
+    if v_used >= v_cap then
+      raise exception 'Cet avion est complet : déposez la personne sur un membre de l''équipage pour échanger leurs places.';
+    end if;
+    if p_who = 'organizer' then
+      update public.outings set instructor_aircraft_id = p_aircraft where id = p_outing;
+    else
+      update public.registrations set aircraft_id = p_aircraft where id = v_reg.id;
+    end if;
+  else
+    if p_with = p_who then return; end if;
+    if p_with = 'organizer' then
+      if v_outing.instructor_aircraft_id is distinct from p_aircraft then
+        raise exception 'L''organisateur n''est pas dans cet avion.';
+      end if;
+      update public.outings set instructor_aircraft_id = v_from where id = p_outing;
+      update public.registrations set aircraft_id = p_aircraft where id = v_reg.id;
+    else
+      select * into v_other from public.registrations
+       where id = p_with::uuid and outing_id = p_outing and status = 'confirmed' and aircraft_id = p_aircraft for update;
+      if not found then raise exception 'Cette personne n''est pas dans cet avion.'; end if;
+      update public.registrations set aircraft_id = v_from where id = v_other.id;
+      if p_who = 'organizer' then
+        update public.outings set instructor_aircraft_id = p_aircraft where id = p_outing;
+      else
+        update public.registrations set aircraft_id = p_aircraft where id = v_reg.id;
+      end if;
+    end if;
+  end if;
+
+  if exists (
+    select 1
+    from public.outing_aircraft oa
+    join public.aircraft a on a.id = oa.aircraft_id
+    join public.outings o on o.id = oa.outing_id
+    where oa.outing_id = p_outing
+      and (select count(*) from public.registrations r
+            where r.outing_id = p_outing and r.status = 'confirmed' and r.aircraft_id = oa.aircraft_id)
+          > greatest(a.seats - case when o.instructor_aircraft_id = a.id then 1 else 0 end, 0)
+  ) then
+    raise exception 'Ce déplacement dépasserait le nombre de places d''un avion.';
+  end if;
+end;
+$function$;
+
+revoke execute on function public.get_outing(uuid) from public, anon;
+grant execute on function public.get_outing(uuid) to authenticated;
+revoke execute on function public.move_crew(uuid, text, uuid, text) from public, anon;
+grant execute on function public.move_crew(uuid, text, uuid, text) to authenticated;
+
+notify pgrst, 'reload schema';
+
 
 -- =====================================================================
 --  Mise à jour n°26 : données masse & centrage depuis les manuels de vol
 -- =====================================================================
-\i supabase/migration-26-aircraft-mb-data.sql
+-- =====================================================================
+--  Mise à jour n°26 : données masse & centrage depuis les manuels de vol
+--  et fiches de pesée de chaque appareil.
+--  « Base toi sur les manuels de vol de chaque avion, n'invente rien. »
+-- =====================================================================
+
+-- -------------------------------------------------------------------------
+-- PS-28 Cruiser × 5  (F-HNLR, F-HSAC, F-HUIT, F-HPSA, F-HSAA)
+--
+-- Sources : Manuel de vol PS-28 Cruiser (Czech Sport Aircraft)
+--           + fiches de pesée individuelles
+-- MTOW : 600 kg — MLW : 600 kg (avion LSA)
+-- Datum : Rib #4 (nervure n°4) — d'après POH section 6.4
+-- Réservoir principal : 2 × 57 L (total 114 L), bras 0.180 m
+-- Postes (d'après tableau de chargement du POH) :
+--   Pilote           0.700 m  max 115 kg
+--   Passager         0.700 m  max 115 kg
+--   Bagages coffre   1.310 m  max 18 kg
+--   Casiers d'aile   0.600 m  max 20 kg  (10 kg par aile × 2, dans l'aile → exclus du MZFW)
+--   Carburant        0.180 m  max 114 L  (fuel, density 0.72)
+-- Domaine : rectangle 0.420–0.525 m × 400–600 kg
+-- -------------------------------------------------------------------------
+
+-- F-HNLR
+insert into public.aircraft_mb (
+  aircraft_id, serial,
+  empty_mass, empty_moment,
+  mtow, mlw,
+  fuel_arm, fuel_density, fuel_capacity_l,
+  stations, envelope, source, updated_at
+)
+select
+  a.id,
+  null,             -- numéro de série non disponible dans les documents fournis
+  386.5,            -- fiche de pesée F-HNLR
+  164.2625,         -- fiche de pesée F-HNLR
+  600, 600,
+  0.180, 0.72, 114,
+  '[
+    {"label":"Pilote",         "arm":0.700,"max":115},
+    {"label":"Passager",       "arm":0.700,"max":115},
+    {"label":"Bagages coffre", "arm":1.310,"max":18},
+    {"label":"Casiers aile",   "arm":0.600,"max":20, "wing":true},
+    {"label":"Carburant",      "arm":0.180,"max":114,"fuel":true}
+  ]'::jsonb,
+  '[
+    {"arm":0.420,"mass":400},
+    {"arm":0.420,"mass":600},
+    {"arm":0.525,"mass":600},
+    {"arm":0.525,"mass":400}
+  ]'::jsonb,
+  'Manuel de vol PS-28 Cruiser (Czech Sport Aircraft) + fiche de pesée F-HNLR',
+  now()
+from public.aircraft a
+where a.registration = 'F-HNLR'
+on conflict (aircraft_id) do update set
+  serial           = excluded.serial,
+  empty_mass       = excluded.empty_mass,
+  empty_moment     = excluded.empty_moment,
+  mtow             = excluded.mtow,
+  mlw              = excluded.mlw,
+  fuel_arm         = excluded.fuel_arm,
+  fuel_density     = excluded.fuel_density,
+  fuel_capacity_l  = excluded.fuel_capacity_l,
+  stations         = excluded.stations,
+  envelope         = excluded.envelope,
+  source           = excluded.source,
+  updated_at       = now();
+
+-- F-HSAC
+insert into public.aircraft_mb (
+  aircraft_id, serial,
+  empty_mass, empty_moment,
+  mtow, mlw,
+  fuel_arm, fuel_density, fuel_capacity_l,
+  stations, envelope, source, updated_at
+)
+select
+  a.id,
+  null,
+  393.0,            -- fiche de pesée F-HSAC
+  170.022,          -- fiche de pesée F-HSAC
+  600, 600,
+  0.180, 0.72, 114,
+  '[
+    {"label":"Pilote",         "arm":0.700,"max":115},
+    {"label":"Passager",       "arm":0.700,"max":115},
+    {"label":"Bagages coffre", "arm":1.310,"max":18},
+    {"label":"Casiers aile",   "arm":0.600,"max":20, "wing":true},
+    {"label":"Carburant",      "arm":0.180,"max":114,"fuel":true}
+  ]'::jsonb,
+  '[
+    {"arm":0.420,"mass":400},
+    {"arm":0.420,"mass":600},
+    {"arm":0.525,"mass":600},
+    {"arm":0.525,"mass":400}
+  ]'::jsonb,
+  'Manuel de vol PS-28 Cruiser (Czech Sport Aircraft) + fiche de pesée F-HSAC',
+  now()
+from public.aircraft a
+where a.registration = 'F-HSAC'
+on conflict (aircraft_id) do update set
+  serial           = excluded.serial,
+  empty_mass       = excluded.empty_mass,
+  empty_moment     = excluded.empty_moment,
+  mtow             = excluded.mtow,
+  mlw              = excluded.mlw,
+  fuel_arm         = excluded.fuel_arm,
+  fuel_density     = excluded.fuel_density,
+  fuel_capacity_l  = excluded.fuel_capacity_l,
+  stations         = excluded.stations,
+  envelope         = excluded.envelope,
+  source           = excluded.source,
+  updated_at       = now();
+
+-- F-HUIT
+insert into public.aircraft_mb (
+  aircraft_id, serial,
+  empty_mass, empty_moment,
+  mtow, mlw,
+  fuel_arm, fuel_density, fuel_capacity_l,
+  stations, envelope, source, updated_at
+)
+select
+  a.id,
+  null,
+  387.5,            -- fiche de pesée F-HUIT
+  173.212,          -- fiche de pesée F-HUIT
+  600, 600,
+  0.180, 0.72, 114,
+  '[
+    {"label":"Pilote",         "arm":0.700,"max":115},
+    {"label":"Passager",       "arm":0.700,"max":115},
+    {"label":"Bagages coffre", "arm":1.310,"max":18},
+    {"label":"Casiers aile",   "arm":0.600,"max":20, "wing":true},
+    {"label":"Carburant",      "arm":0.180,"max":114,"fuel":true}
+  ]'::jsonb,
+  '[
+    {"arm":0.420,"mass":400},
+    {"arm":0.420,"mass":600},
+    {"arm":0.525,"mass":600},
+    {"arm":0.525,"mass":400}
+  ]'::jsonb,
+  'Manuel de vol PS-28 Cruiser (Czech Sport Aircraft) + fiche de pesée F-HUIT',
+  now()
+from public.aircraft a
+where a.registration = 'F-HUIT'
+on conflict (aircraft_id) do update set
+  serial           = excluded.serial,
+  empty_mass       = excluded.empty_mass,
+  empty_moment     = excluded.empty_moment,
+  mtow             = excluded.mtow,
+  mlw              = excluded.mlw,
+  fuel_arm         = excluded.fuel_arm,
+  fuel_density     = excluded.fuel_density,
+  fuel_capacity_l  = excluded.fuel_capacity_l,
+  stations         = excluded.stations,
+  envelope         = excluded.envelope,
+  source           = excluded.source,
+  updated_at       = now();
+
+-- F-HPSA
+insert into public.aircraft_mb (
+  aircraft_id, serial,
+  empty_mass, empty_moment,
+  mtow, mlw,
+  fuel_arm, fuel_density, fuel_capacity_l,
+  stations, envelope, source, updated_at
+)
+select
+  a.id,
+  null,
+  402.7,            -- fiche de pesée F-HPSA
+  173.3057,         -- fiche de pesée F-HPSA
+  600, 600,
+  0.180, 0.72, 114,
+  '[
+    {"label":"Pilote",         "arm":0.700,"max":115},
+    {"label":"Passager",       "arm":0.700,"max":115},
+    {"label":"Bagages coffre", "arm":1.310,"max":18},
+    {"label":"Casiers aile",   "arm":0.600,"max":20, "wing":true},
+    {"label":"Carburant",      "arm":0.180,"max":114,"fuel":true}
+  ]'::jsonb,
+  '[
+    {"arm":0.420,"mass":400},
+    {"arm":0.420,"mass":600},
+    {"arm":0.525,"mass":600},
+    {"arm":0.525,"mass":400}
+  ]'::jsonb,
+  'Manuel de vol PS-28 Cruiser (Czech Sport Aircraft) + fiche de pesée F-HPSA',
+  now()
+from public.aircraft a
+where a.registration = 'F-HPSA'
+on conflict (aircraft_id) do update set
+  serial           = excluded.serial,
+  empty_mass       = excluded.empty_mass,
+  empty_moment     = excluded.empty_moment,
+  mtow             = excluded.mtow,
+  mlw              = excluded.mlw,
+  fuel_arm         = excluded.fuel_arm,
+  fuel_density     = excluded.fuel_density,
+  fuel_capacity_l  = excluded.fuel_capacity_l,
+  stations         = excluded.stations,
+  envelope         = excluded.envelope,
+  source           = excluded.source,
+  updated_at       = now();
+
+-- F-HSAA  (remplace l'entrée partielle de la migration-20)
+insert into public.aircraft_mb (
+  aircraft_id, serial,
+  empty_mass, empty_moment,
+  mtow, mlw,
+  fuel_arm, fuel_density, fuel_capacity_l,
+  stations, envelope, source, updated_at
+)
+select
+  a.id,
+  'C0502',          -- numéro de série (figurait dans la migration-20)
+  393.5,            -- fiche de pesée F-HSAA
+  169.789,          -- fiche de pesée F-HSAA (169.8 arrondi précédent, valeur exacte)
+  600, 600,
+  0.180, 0.72, 114,
+  '[
+    {"label":"Pilote",         "arm":0.700,"max":115},
+    {"label":"Passager",       "arm":0.700,"max":115},
+    {"label":"Bagages coffre", "arm":1.310,"max":18},
+    {"label":"Casiers aile",   "arm":0.600,"max":20, "wing":true},
+    {"label":"Carburant",      "arm":0.180,"max":114,"fuel":true}
+  ]'::jsonb,
+  '[
+    {"arm":0.420,"mass":400},
+    {"arm":0.420,"mass":600},
+    {"arm":0.525,"mass":600},
+    {"arm":0.525,"mass":400}
+  ]'::jsonb,
+  'Manuel de vol PS-28 Cruiser (Czech Sport Aircraft) + fiche de pesée F-HSAA',
+  now()
+from public.aircraft a
+where a.registration = 'F-HSAA'
+on conflict (aircraft_id) do update set
+  serial           = excluded.serial,
+  empty_mass       = excluded.empty_mass,
+  empty_moment     = excluded.empty_moment,
+  mtow             = excluded.mtow,
+  mlw              = excluded.mlw,
+  fuel_arm         = excluded.fuel_arm,
+  fuel_density     = excluded.fuel_density,
+  fuel_capacity_l  = excluded.fuel_capacity_l,
+  stations         = excluded.stations,
+  envelope         = excluded.envelope,
+  source           = excluded.source,
+  updated_at       = now();
+
+-- -------------------------------------------------------------------------
+-- Diamond DA40 (F-HXAF)
+--
+-- Sources : DA40 POH + fiche de pesée F-HXAF
+-- MTOW : 1150 kg — MLW : 1092 kg — MZFW : 1150 kg
+-- Datum : bord d'attaque intrados (standard Diamond)
+-- Réservoir : 2 × 64 L = 128 L usable, bras 2.630 m
+-- Postes :
+--   Sièges avant           2.300 m  pas de max individuel (limite structurelle combinée)
+--   Sièges arrière         3.250 m  idem
+--   Bagages standard       3.650 m  max 30 kg
+--   Bagages tube            4.320 m  max 5 kg
+-- -------------------------------------------------------------------------
+
+insert into public.aircraft_mb (
+  aircraft_id, serial,
+  empty_mass, empty_moment,
+  mtow, mlw, mzfw,
+  fuel_arm, fuel_density, fuel_capacity_l,
+  stations, envelope, source, updated_at
+)
+select
+  a.id,
+  null,
+  774.5,            -- fiche de pesée F-HXAF
+  1878.16,          -- fiche de pesée F-HXAF  (en kg.m)
+  1150, 1092, 1150,
+  2.630, 0.72, 128,
+  '[
+    {"label":"Sièges avant",      "arm":2.300,"max":null},
+    {"label":"Sièges arrière",    "arm":3.250,"max":null},
+    {"label":"Bagages standard",  "arm":3.650,"max":30},
+    {"label":"Bagages tube",      "arm":4.320,"max":5}
+  ]'::jsonb,
+  '[
+    {"arm":2.40,"mass":780},
+    {"arm":2.40,"mass":980},
+    {"arm":2.46,"mass":1150},
+    {"arm":2.59,"mass":1150},
+    {"arm":2.59,"mass":780}
+  ]'::jsonb,
+  'Manuel de vol Diamond DA40 + fiche de pesée F-HXAF',
+  now()
+from public.aircraft a
+where a.registration = 'F-HXAF'
+on conflict (aircraft_id) do update set
+  serial           = excluded.serial,
+  empty_mass       = excluded.empty_mass,
+  empty_moment     = excluded.empty_moment,
+  mtow             = excluded.mtow,
+  mlw              = excluded.mlw,
+  mzfw             = excluded.mzfw,
+  fuel_arm         = excluded.fuel_arm,
+  fuel_density     = excluded.fuel_density,
+  fuel_capacity_l  = excluded.fuel_capacity_l,
+  stations         = excluded.stations,
+  envelope         = excluded.envelope,
+  source           = excluded.source,
+  updated_at       = now();
+
+-- -------------------------------------------------------------------------
+-- Robin DR400-180 (F-HCLI)
+--
+-- Sources : Manuel de vol Robin DR400-180 + fiche de pesée F-HCLI
+-- MTOW : 1100 kg — MLW : 1045 kg
+-- Datum : bord d'attaque de la voilure rectangulaire
+-- Pas de réservoir principal central (fuel_capacity_l = null) :
+--   les réservoirs sont 2 postes de chargement en litres.
+--   Le bras de référence carburant (fuel_arm) est celui du réservoir principal
+--   utilisé comme bras par défaut pour le trip fuel.
+-- Postes :
+--   Sièges avant      0.410 m  max 154 kg (2 places)
+--   Sièges arrière    1.190 m  max 154 kg (2 places)
+--   Réservoir princ.  1.120 m  max 110 L  (fuel) — 78 kg / 0.72 = 108.3 L ≈ 110 L (fiche pesée confirme 79.2 kg = 110 L)
+--   Réservoir ailes   0.100 m  max 80 L   (fuel, dans l'aile → wing)
+--   Bagages           1.900 m  max 60 kg
+-- Domaine : trapèze (d'après diagramme manuel DR400)
+-- -------------------------------------------------------------------------
+
+insert into public.aircraft_mb (
+  aircraft_id, serial,
+  empty_mass, empty_moment,
+  mtow, mlw,
+  fuel_arm, fuel_density, fuel_capacity_l,
+  stations, envelope, source, updated_at
+)
+select
+  a.id,
+  null,
+  644.0,            -- fiche de pesée F-HCLI
+  211.876,          -- fiche de pesée F-HCLI  (en kg.m)
+  1100, 1045,
+  1.120, 0.72, null,   -- pas de réservoir central ; bras = réservoir principal
+  '[
+    {"label":"Sièges avant",          "arm":0.410,"max":154},
+    {"label":"Sièges arrière",        "arm":1.190,"max":154},
+    {"label":"Réservoir principal",   "arm":1.120,"max":110,"fuel":true},
+    {"label":"Réservoir ailes",       "arm":0.100,"max":80, "fuel":true,"wing":true},
+    {"label":"Bagages",               "arm":1.900,"max":60}
+  ]'::jsonb,
+  '[
+    {"arm":0.205,"mass":750},
+    {"arm":0.328,"mass":1100},
+    {"arm":0.564,"mass":1100},
+    {"arm":0.428,"mass":750}
+  ]'::jsonb,
+  'Manuel de vol Robin DR400-180 + fiche de pesée F-HCLI',
+  now()
+from public.aircraft a
+where a.registration = 'F-HCLI'
+on conflict (aircraft_id) do update set
+  serial           = excluded.serial,
+  empty_mass       = excluded.empty_mass,
+  empty_moment     = excluded.empty_moment,
+  mtow             = excluded.mtow,
+  mlw              = excluded.mlw,
+  mzfw             = null,
+  fuel_arm         = excluded.fuel_arm,
+  fuel_density     = excluded.fuel_density,
+  fuel_capacity_l  = excluded.fuel_capacity_l,
+  stations         = excluded.stations,
+  envelope         = excluded.envelope,
+  source           = excluded.source,
+  updated_at       = now();
+
+-- -------------------------------------------------------------------------
+-- Bristell B23-915 (F-HUFA)
+--
+-- Sources : Manuel de vol Bristell B23-915 (ADXC-73-003-AFM, Rév.B3, 24.11.2023)
+--           + fiche de pesée F-HUFA (BRM-211, 07.07.2022)
+-- MTOW : 750 kg (LSA)
+-- S/N : 0077
+-- Datum : flasque hélice (Propeller Flange)
+-- Conversion %MAC → mètres : bras_m = MAC_LE + (%MAC/100) × MAC = 1.377 + (%MAC/100) × 1.343
+-- Réservoir (§2.13) : 2 réservoirs × 60 L = 120 L total ; utilisable 2×56 = 112 L
+--   Carburant approuvé : UL95/SP95, AVGAS UL91, AVGAS 100LL
+--   bras : 1.600 m (§6.5 — "FUEL weight = qty×0.72 kg/liter, arm 1.600")
+-- Postes (§6.5) :
+--   Pilote & Passager           2.085 m  max 2×120 kg (voir §6.4 ; min 55 kg pilote)
+--   Bagages derrière sièges     2.520 m  max 16 kg (lower 15 kg + upper 1 kg, §2.7)
+--   Casiers aile (wing lockers) 2.025 m  max 40 kg (2×20 kg/côté, §2.7) — dans l'aile
+--   Carburant                   1.600 m  max 120 L total (fuel)
+-- Domaine CG (§2.8 — graphique en %MAC converti en mètres) :
+--   %MAC 25%→34.5% (operating CG range)
+--   Points clés :  (1.713,530) (1.713,600) (1.753,660) (1.793,750) (1.834,750) (1.840,600) (1.834,530)
+-- -------------------------------------------------------------------------
+
+insert into public.aircraft_mb (
+  aircraft_id, serial,
+  empty_mass, empty_moment,
+  mtow,
+  fuel_arm, fuel_density, fuel_capacity_l,
+  stations, envelope, source, updated_at
+)
+select
+  a.id,
+  '0077',
+  469.5,            -- fiche de pesée F-HUFA (07.07.2022)
+  800.8,            -- fiche de pesée F-HUFA  (en kg.m)
+  750,
+  1.600, 0.72, 120,   -- §2.13 : 2×60 L = 120 L total
+  '[
+    {"label":"Pilote & Passager",       "arm":2.085,"max":240},
+    {"label":"Bagages derrière sièges", "arm":2.520,"max":16},
+    {"label":"Casiers aile",            "arm":2.025,"max":40,"wing":true},
+    {"label":"Carburant",               "arm":1.600,"max":120,"fuel":true}
+  ]'::jsonb,
+  '[
+    {"arm":1.713,"mass":530},
+    {"arm":1.713,"mass":600},
+    {"arm":1.753,"mass":660},
+    {"arm":1.793,"mass":750},
+    {"arm":1.834,"mass":750},
+    {"arm":1.840,"mass":600},
+    {"arm":1.834,"mass":530}
+  ]'::jsonb,
+  'Manuel de vol Bristell B23-915 (ADXC-73-003-AFM Rév.B3) + fiche de pesée F-HUFA (BRM-211 07.07.2022)',
+  now()
+from public.aircraft a
+where a.registration = 'F-HUFA'
+on conflict (aircraft_id) do update set
+  serial           = excluded.serial,
+  empty_mass       = excluded.empty_mass,
+  empty_moment     = excluded.empty_moment,
+  mtow             = excluded.mtow,
+  mlw              = null,
+  mzfw             = null,
+  fuel_arm         = excluded.fuel_arm,
+  fuel_density     = excluded.fuel_density,
+  fuel_capacity_l  = excluded.fuel_capacity_l,
+  stations         = excluded.stations,
+  envelope         = excluded.envelope,
+  source           = excluded.source,
+  updated_at       = now();
+
+-- -------------------------------------------------------------------------
+-- WT9 Dynamic LSA (F-HVXD)
+--
+-- Sources : Manuel de vol WT9 Dynamic LSA (aerodynamika Žilina)
+--           + fiche de pesée F-HVXD
+-- MTOW : 600 kg (LSA)
+-- Datum : 1.975 m en avant de la face intérieure du pare-feu (firewall)
+-- Réservoir : 80 L usable, bras 2.580 m, densité 0.72
+-- Postes (tableau Section 6 du POH) :
+--   Pilote / Passager   3.130 m  max 120 kg combiné
+--   Bagages             3.795 m  max 40 kg (2 × 20 kg)
+-- Domaine CG (Section 6 du POH, graphique de centrage) :
+--   polygone à 8 points lus sur le diagramme
+-- Masse à vide : fiche de pesée F-HVXD (339.6 kg / 898.26 kg.m)
+--   NB : le W&B Record du POH indique 344.6 kg / 911.16 kg.m après SB SBLSA-916-2019
+--        (mars 2020) — la fiche de pesée individuelle fait foi.
+-- -------------------------------------------------------------------------
+
+insert into public.aircraft_mb (
+  aircraft_id, serial,
+  empty_mass, empty_moment,
+  mtow,
+  fuel_arm, fuel_density, fuel_capacity_l,
+  stations, envelope, source, updated_at
+)
+select
+  a.id,
+  null,
+  339.6,            -- fiche de pesée F-HVXD
+  898.26,           -- fiche de pesée F-HVXD  (en kg.m)
+  600,
+  2.580, 0.72, 80,
+  '[
+    {"label":"Pilote / Passager", "arm":3.130,"max":120},
+    {"label":"Bagages",           "arm":3.795,"max":40}
+  ]'::jsonb,
+  '[
+    {"arm":2.704,"mass":405.0},
+    {"arm":2.713,"mass":405.0},
+    {"arm":2.730,"mass":412.0},
+    {"arm":2.810,"mass":445.0},
+    {"arm":2.824,"mass":465.3},
+    {"arm":2.824,"mass":600.0},
+    {"arm":2.748,"mass":600.0},
+    {"arm":2.704,"mass":542.5}
+  ]'::jsonb,
+  'Manuel de vol WT9 Dynamic LSA (aerodynamika Žilina) + fiche de pesée F-HVXD',
+  now()
+from public.aircraft a
+where a.registration = 'F-HVXD'
+on conflict (aircraft_id) do update set
+  serial           = excluded.serial,
+  empty_mass       = excluded.empty_mass,
+  empty_moment     = excluded.empty_moment,
+  mtow             = excluded.mtow,
+  mlw              = null,
+  mzfw             = null,
+  fuel_arm         = excluded.fuel_arm,
+  fuel_density     = excluded.fuel_density,
+  fuel_capacity_l  = excluded.fuel_capacity_l,
+  stations         = excluded.stations,
+  envelope         = excluded.envelope,
+  source           = excluded.source,
+  updated_at       = now();
+
+notify pgrst, 'reload schema';
+
+
+-- =====================================================================
+--  Mise à jour n°25 bis : shop
+-- =====================================================================
+-- =====================================================================
+--  Mise à jour n°25 : Le Shop — articles, commandes
+--  À exécuter une fois dans Supabase > SQL Editor > New query > Run.
+-- =====================================================================
+
+-- Table des articles du shop
+create table if not exists public.shop_items (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  description text,
+  price_cents int not null default 0,   -- prix en centimes (0 = gratuit/sur devis)
+  category    text not null default 'vetement', -- vetement | accessoire
+  image_url   text,
+  sizes       text,                     -- 'XS,S,M,L,XL,XXL' séparés par virgule, ou null
+  colors      text,                     -- 'Blanc,Marine,Rouge' séparés par virgule, ou null
+  active      boolean not null default true,
+  position    int not null default 0,
+  created_at  timestamptz not null default now()
+);
+
+-- Table des commandes
+create table if not exists public.shop_orders (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  item_id     uuid not null references public.shop_items(id) on delete restrict,
+  quantity    int not null default 1,
+  size        text,
+  color       text,
+  note        text,
+  status      text not null default 'pending', -- pending | confirmed | ready | delivered | cancelled
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+-- RLS
+alter table public.shop_items enable row level security;
+alter table public.shop_orders enable row level security;
+
+-- shop_items : lisibles par tous les membres, modifiables par admin
+drop policy if exists "shop_items_read"   on public.shop_items;
+drop policy if exists "shop_items_write"  on public.shop_items;
+
+create policy "shop_items_read" on public.shop_items
+  for select using (public.is_approved());
+
+create policy "shop_items_write" on public.shop_items
+  for all using (
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- shop_orders : chaque membre voit ses commandes ; admin voit tout
+drop policy if exists "shop_orders_self"   on public.shop_orders;
+drop policy if exists "shop_orders_admin"  on public.shop_orders;
+drop policy if exists "shop_orders_insert" on public.shop_orders;
+
+create policy "shop_orders_insert" on public.shop_orders
+  for insert with check (user_id = auth.uid() and public.is_approved());
+
+create policy "shop_orders_self" on public.shop_orders
+  for select using (user_id = auth.uid());
+
+create policy "shop_orders_admin" on public.shop_orders
+  for all using (
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- Trigger updated_at
+create or replace function public.touch_shop_order()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin new.updated_at := now(); return new; end; $$;
+
+drop trigger if exists touch_shop_order on public.shop_orders;
+create trigger touch_shop_order
+  before update on public.shop_orders
+  for each row execute function public.touch_shop_order();
+
+-- Quelques articles d'exemple (à adapter / supprimer)
+-- (seulement si le catalogue est vide, pour pouvoir relancer ce fichier sans créer de doublons)
+insert into public.shop_items (name, description, price_cents, category, sizes, colors, position)
+select * from (values
+  ('T-shirt club', 'T-shirt coton 100% aux couleurs du club, logo brodé au cœur', 2500, 'Vêtements', 'XS,S,M,L,XL,XXL', 'Blanc,Marine', 1),
+  ('Polaire softshell', 'Veste softshell légère avec logo club, idéale pour les briefings sur le tarmac', 5500, 'Vêtements', 'S,M,L,XL,XXL', 'Marine,Gris', 2),
+  ('Casquette brodée', 'Casquette ajustable avec logo club brodé', 2000, 'Accessoires', null, 'Marine,Blanc', 3),
+  ('Mug "Pilote"', 'Mug céramique 350 ml, motif avion et indicatif LFMA', 1200, 'Accessoires', null, 'Blanc', 4),
+  ('Sticker pack', 'Pack de 5 stickers vinyle : logo club, LFMA, avions de la flotte…', 500, 'Accessoires', null, null, 5)
+) as v(name, description, price_cents, category, sizes, colors, position)
+where not exists (select 1 from public.shop_items);
+
+-- Colonnes ajoutées depuis (nom et prix figés à la commande, débit de l'ardoise)
+alter table public.shop_orders
+  add column if not exists item_name       text,
+  add column if not exists price_cents     int,
+  add column if not exists ardoise_charged boolean not null default false;
+
+notify pgrst, 'reload schema';
+
+
+-- =====================================================================
+--  Mise à jour n°27 : Shareflight
+-- =====================================================================
+-- =====================================================================
+--  Mise à jour n°27 : Shareflight — covoiturage aérien entre membres
+--
+--  Un pilote publie un projet de vol (départ, destination, date,
+--  places libres, commentaire) ; d'autres membres peuvent s'inscrire
+--  comme passagers. Le pilote ou un admin peut clore ou annuler le vol.
+--  Les passagers peuvent se désinscrire tant que le vol n'est pas clôturé.
+-- =====================================================================
+
+-- Table principale : propositions de vols
+create table if not exists public.flight_shares (
+  id            uuid primary key default gen_random_uuid(),
+  pilot_id      uuid not null references public.profiles (id) on delete cascade default auth.uid(),
+  -- Aérodrome départ
+  dep_icao      text not null check (dep_icao ~ '^[A-Z]{2}[A-Z0-9]{2}$'),
+  dep_name      text not null check (length(btrim(dep_name)) between 1 and 80),
+  dep_lat       numeric(8,5) not null,
+  dep_lon       numeric(8,5) not null,
+  -- Aérodrome arrivée
+  arr_icao      text not null check (arr_icao ~ '^[A-Z]{2}[A-Z0-9]{2}$'),
+  arr_name      text not null check (length(btrim(arr_name)) between 1 and 80),
+  arr_lat       numeric(8,5) not null,
+  arr_lon       numeric(8,5) not null,
+  -- Vol
+  flight_date   date not null,
+  seats         smallint not null default 1 check (seats between 1 and 5),
+  aircraft      text check (aircraft is null or length(btrim(aircraft)) <= 40),
+  comment       text check (comment is null or length(comment) <= 600),
+  -- Statut : open | closed | cancelled
+  status        text not null default 'open' check (status in ('open','closed','cancelled')),
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+  closed_at     timestamptz
+);
+
+create index if not exists flight_shares_date on public.flight_shares (flight_date) where status = 'open';
+create index if not exists flight_shares_pilot on public.flight_shares (pilot_id);
+
+alter table public.flight_shares enable row level security;
+revoke truncate on public.flight_shares from public, anon, authenticated;
+
+-- Lecture : tout membre approuvé
+drop policy if exists flight_shares_select on public.flight_shares;
+create policy flight_shares_select on public.flight_shares
+  for select to authenticated using (public.is_approved());
+
+-- Insertion : membre approuvé uniquement, pour soi-même
+drop policy if exists flight_shares_insert on public.flight_shares;
+create policy flight_shares_insert on public.flight_shares
+  for insert to authenticated
+  with check (public.is_approved() and pilot_id = auth.uid());
+
+-- Mise à jour : pilote ou admin (statut, fermeture…)
+drop policy if exists flight_shares_update on public.flight_shares;
+create policy flight_shares_update on public.flight_shares
+  for update to authenticated
+  using (public.is_approved() and (pilot_id = auth.uid() or public.app_role() = 'admin'))
+  with check (public.is_approved() and (pilot_id = auth.uid() or public.app_role() = 'admin'));
+
+-- Pas de suppression physique
+revoke delete on public.flight_shares from authenticated, anon;
+
+-- Audit
+drop trigger if exists zz_audit on public.flight_shares;
+create trigger zz_audit after insert or update on public.flight_shares
+  for each row execute function public._audit();
+
+
+-- Table des passagers inscrits
+create table if not exists public.flight_share_seats (
+  id            uuid primary key default gen_random_uuid(),
+  share_id      uuid not null references public.flight_shares (id) on delete cascade,
+  member_id     uuid not null references public.profiles (id) on delete cascade,
+  message       text check (message is null or length(message) <= 300),
+  created_at    timestamptz not null default now(),
+  unique (share_id, member_id)
+);
+
+create index if not exists flight_share_seats_share on public.flight_share_seats (share_id);
+
+alter table public.flight_share_seats enable row level security;
+revoke truncate on public.flight_share_seats from public, anon, authenticated;
+
+-- Lecture : tout membre approuvé
+drop policy if exists flight_share_seats_select on public.flight_share_seats;
+create policy flight_share_seats_select on public.flight_share_seats
+  for select to authenticated using (public.is_approved());
+
+-- Inscription : pour soi-même, vol ouvert, pas déjà inscrit, place disponible
+drop policy if exists flight_share_seats_insert on public.flight_share_seats;
+create policy flight_share_seats_insert on public.flight_share_seats
+  for insert to authenticated
+  with check (
+    public.is_approved()
+    and member_id = auth.uid()
+    and exists (
+      select 1 from public.flight_shares fs
+      where fs.id = share_id
+        and fs.status = 'open'
+        and fs.pilot_id <> auth.uid()
+        and (
+          select count(*) from public.flight_share_seats s2 where s2.share_id = fs.id
+        ) < fs.seats
+    )
+  );
+
+-- Désinscription : soi-même ou admin
+drop policy if exists flight_share_seats_delete on public.flight_share_seats;
+create policy flight_share_seats_delete on public.flight_share_seats
+  for delete to authenticated
+  using (public.is_approved() and (member_id = auth.uid() or public.app_role() = 'admin'));
+
+notify pgrst, 'reload schema';
+
+
+-- =====================================================================
+--  Mise à jour n°28 : corrections avant la mise en service
+-- =====================================================================
+-- =====================================================================
+--  Mise à jour n°28 : corrections avant la mise en service
+--  - Aligne le dépôt sur la base réelle (colonnes du shop, tables du quiz,
+--    colonne referent_instructor_id) : sans effet si c'est déjà le cas.
+--  - Shop : annulation par le membre et passage « livrée » avec débit de
+--    l'ardoise, par des fonctions sécurisées (les tables restent protégées).
+--  - Quiz : la bonne réponse n'est plus lisible avant d'avoir répondu, les
+--    réponses ne sont plus lisibles sans être connecté ; question du jour,
+--    réponse et classement passent par des fonctions.
+--  - Stats bar + shop pour les administrateurs et le trésorier.
+--  - Stockage : seuls les administrateurs déposent les images du shop
+--    (images uniquement, 5 Mo maximum).
+--  - Petits durcissements signalés par l'outil de sécurité de Supabase.
+--  Peut être exécutée plusieurs fois sans risque.
+--  À exécuter dans Supabase > SQL Editor > New query > Run.
+-- =====================================================================
+
+-- 0. Alignement du dépôt sur la base réelle --------------------------------
+alter table public.outings
+  add column if not exists referent_instructor_id uuid references public.profiles (id);
+
+alter table public.shop_orders
+  add column if not exists item_name       text,
+  add column if not exists price_cents     int,
+  add column if not exists ardoise_charged boolean not null default false;
+
+create table if not exists public.quiz_questions (
+  id          serial primary key,
+  question    text not null,
+  option_a    text not null,
+  option_b    text not null,
+  option_c    text not null,
+  option_d    text not null,
+  correct     char(1) not null check (correct in ('a', 'b', 'c', 'd')),
+  explanation text,
+  category    text,
+  active      boolean not null default true
+);
+create table if not exists public.quiz_answers (
+  id          serial primary key,
+  user_id     uuid not null references auth.users (id) on delete cascade,
+  question_id int  not null references public.quiz_questions (id),
+  answered_on date not null,
+  is_correct  boolean not null,
+  unique (user_id, answered_on)
+);
+alter table public.quiz_questions enable row level security;
+alter table public.quiz_answers  enable row level security;
+
+-- 1. Shop --------------------------------------------------------------------
+create or replace function public.cancel_shop_order(p_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_order public.shop_orders;
+begin
+  if not public.is_approved() then raise exception 'Votre compte n''est pas encore validé.'; end if;
+  select * into v_order from public.shop_orders where id = p_id for update;
+  if not found then raise exception 'Commande introuvable.'; end if;
+  if v_order.user_id <> auth.uid() and public.app_role() <> 'admin' then
+    raise exception 'Ce n''est pas votre commande.';
+  end if;
+  if v_order.status <> 'pending' and public.app_role() <> 'admin' then
+    raise exception 'Cette commande est déjà en préparation : contactez le club pour l''annuler.';
+  end if;
+  if v_order.status in ('delivered', 'cancelled') then raise exception 'Cette commande est déjà clôturée.'; end if;
+  update public.shop_orders set status = 'cancelled', updated_at = now() where id = p_id;
+end;
+$$;
+
+-- Change le statut d'une commande ; « delivered » débite l'ardoise du membre une seule fois.
+create or replace function public.set_shop_order_status(p_id uuid, p_status text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_order   public.shop_orders;
+  v_label   text;
+  v_variant text;
+  v_charged boolean := false;
+begin
+  if public.app_role() is distinct from 'admin' then raise exception 'Réservé aux administrateurs.'; end if;
+  if p_status not in ('pending', 'confirmed', 'ready', 'delivered', 'cancelled') then
+    raise exception 'Statut inconnu.';
+  end if;
+  select * into v_order from public.shop_orders where id = p_id for update;
+  if not found then raise exception 'Commande introuvable.'; end if;
+
+  if p_status = 'delivered' and not v_order.ardoise_charged and coalesce(v_order.price_cents, 0) > 0 then
+    v_variant := concat_ws(' / ', nullif(v_order.size, ''), nullif(v_order.color, ''));
+    v_label := 'Shop – ' || coalesce(v_order.item_name, 'Article')
+               || case when v_variant <> '' then ' (' || v_variant || ')' else '' end;
+    insert into public.bar_consumptions (user_id, product_id, product_name, unit_price_cents, quantity, created_by)
+    values (v_order.user_id, null, v_label, v_order.price_cents, v_order.quantity, auth.uid());
+    v_charged := true;
+  end if;
+
+  update public.shop_orders
+     set status = p_status,
+         ardoise_charged = ardoise_charged or v_charged,
+         updated_at = now()
+   where id = p_id;
+  return jsonb_build_object('charged', v_charged);
+end;
+$$;
+
+revoke execute on function public.cancel_shop_order(uuid) from public, anon;
+revoke execute on function public.set_shop_order_status(uuid, text) from public, anon;
+grant execute on function public.cancel_shop_order(uuid) to authenticated;
+grant execute on function public.set_shop_order_status(uuid, text) to authenticated;
+
+-- Fonction de déclencheur : n'a pas à être appelable depuis l'API
+do $$ begin
+  if exists (select 1 from pg_proc where proname = 'touch_shop_order' and pronamespace = 'public'::regnamespace) then
+    execute 'revoke execute on function public.touch_shop_order() from public, anon, authenticated';
+  end if;
+end $$;
+
+-- 2. Quiz --------------------------------------------------------------------
+drop policy if exists quiz_answers_all_read on public.quiz_answers;
+drop policy if exists quiz_answers_own_read on public.quiz_answers;
+drop policy if exists quiz_answers_own_insert on public.quiz_answers;
+drop policy if exists quiz_questions_read on public.quiz_questions;
+-- Plus aucun accès direct : tout passe par les fonctions ci-dessous
+revoke all on public.quiz_questions, public.quiz_answers from anon, authenticated;
+
+-- Jour du quiz = date à Paris
+create or replace function public.quiz_day() returns date
+language sql stable set search_path = ''
+as $$ select (now() at time zone 'Europe/Paris')::date $$;
+
+-- Question du jour, sans la bonne réponse (et la réponse du membre s'il a déjà joué)
+create or replace function public.quiz_today()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_n   int;
+  v_q   public.quiz_questions;
+  v_ans public.quiz_answers;
+begin
+  if not public.is_approved() then return null; end if;
+  select count(*) into v_n from public.quiz_questions where active;
+  if v_n = 0 then return null; end if;
+  select * into v_q from public.quiz_questions where active order by id
+   offset ((public.quiz_day() - date '2026-01-01') % v_n + v_n) % v_n limit 1;
+  select * into v_ans from public.quiz_answers where user_id = auth.uid() and answered_on = public.quiz_day();
+  return jsonb_build_object(
+    'id', v_q.id, 'question', v_q.question, 'category', v_q.category,
+    'option_a', v_q.option_a, 'option_b', v_q.option_b, 'option_c', v_q.option_c, 'option_d', v_q.option_d,
+    'already_answered', v_ans.id is not null,
+    -- après avoir répondu, on peut revoir la correction
+    'correct', case when v_ans.id is not null then v_q.correct end,
+    'explanation', case when v_ans.id is not null then v_q.explanation end
+  );
+end;
+$$;
+
+-- Enregistre la réponse du jour (une seule par jour) et renvoie la correction
+create or replace function public.quiz_answer(p_question int, p_answer text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_today jsonb := public.quiz_today();
+  v_q     public.quiz_questions;
+  v_ok    boolean;
+begin
+  if v_today is null then raise exception 'Pas de question aujourd''hui.'; end if;
+  if (v_today->>'id')::int <> p_question then raise exception 'Ce n''est plus la question du jour : rechargez la page.'; end if;
+  if (v_today->>'already_answered')::boolean then raise exception 'Vous avez déjà répondu aujourd''hui.'; end if;
+  select * into v_q from public.quiz_questions where id = p_question;
+  v_ok := v_q.correct = lower(btrim(p_answer));
+  insert into public.quiz_answers (user_id, question_id, answered_on, is_correct)
+  values (auth.uid(), p_question, public.quiz_day(), v_ok)
+  on conflict (user_id, answered_on) do nothing;
+  return jsonb_build_object('correct', v_ok, 'answer', v_q.correct, 'explanation', v_q.explanation);
+end;
+$$;
+
+-- Classement : membres validés, non anonymisés
+create or replace function public.quiz_leaderboard()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_approved() then raise exception 'Votre compte n''est pas encore validé.'; end if;
+  return coalesce((
+    select jsonb_agg(x order by x.correct desc, x.total desc, x.full_name)
+    from (
+      select p.id as user_id, p.full_name, p.avatar_url,
+             count(*)::int as total, count(*) filter (where a.is_correct)::int as correct
+      from public.quiz_answers a
+      join public.profiles p on p.id = a.user_id
+      where p.role <> 'pending' and p.anonymized_at is null
+      group by p.id, p.full_name, p.avatar_url
+      order by 5 desc, 4 desc
+      limit 50
+    ) x), '[]'::jsonb);
+end;
+$$;
+
+-- Mes 30 dernières réponses
+create or replace function public.quiz_my_history()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'question_id', a.question_id, 'answered_on', a.answered_on, 'is_correct', a.is_correct,
+           'question', q.question, 'category', q.category) order by a.answered_on desc), '[]'::jsonb)
+  from (select * from public.quiz_answers where user_id = auth.uid() order by answered_on desc limit 30) a
+  join public.quiz_questions q on q.id = a.question_id;
+$$;
+
+revoke execute on function public.quiz_today(), public.quiz_answer(int, text), public.quiz_leaderboard(),
+  public.quiz_my_history(), public.quiz_day() from public, anon;
+grant execute on function public.quiz_today(), public.quiz_answer(int, text), public.quiz_leaderboard(),
+  public.quiz_my_history(), public.quiz_day() to authenticated;
+
+-- 3. Stats bar + shop (administrateurs et trésorier) -------------------------
+create or replace function public.revenue_stats(p_months int default 12)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+declare
+  v_from date := (date_trunc('month', now() at time zone 'Europe/Paris') - make_interval(months => greatest(p_months, 1) - 1))::date;
+begin
+  if not (public.app_role() = 'admin' or public.is_treasurer()) then
+    raise exception 'Réservé aux administrateurs et au trésorier.';
+  end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('month', to_char(m, 'YYYY-MM'), 'bar', bar, 'shop', shop) order by m)
+    from (
+      select m::date,
+             (select coalesce(sum(c.unit_price_cents * c.quantity), 0) from public.bar_consumptions c
+               where c.product_id is not null   -- les lignes « Shop – … » débitées sur l'ardoise sont comptées côté shop
+                 and date_trunc('month', c.created_at at time zone 'Europe/Paris') = m)::bigint as bar,
+             (select coalesce(sum(o.price_cents * o.quantity), 0) from public.shop_orders o
+               where o.status = 'delivered'
+                 and date_trunc('month', o.created_at at time zone 'Europe/Paris') = m)::bigint as shop
+      from generate_series(v_from, (now() at time zone 'Europe/Paris')::date, interval '1 month') as m
+    ) t), '[]'::jsonb);
+end;
+$$;
+revoke execute on function public.revenue_stats(int) from public, anon;
+grant execute on function public.revenue_stats(int) to authenticated;
+
+-- 4. Stockage des images du shop ---------------------------------------------
+do $$ begin
+  if to_regclass('storage.buckets') is not null then
+    update storage.buckets
+       set file_size_limit = 5242880,
+           allowed_mime_types = array['image/jpeg', 'image/png', 'image/webp']
+     where id = 'documents';
+  end if;
+end $$;
+drop policy if exists "Authenticated users can upload shop images" on storage.objects;
+drop policy if exists shop_images_insert on storage.objects;
+create policy shop_images_insert on storage.objects for insert to authenticated
+  with check (bucket_id = 'documents' and name like 'shop/%' and public.app_role() = 'admin');
+drop policy if exists shop_images_delete on storage.objects;
+create policy shop_images_delete on storage.objects for delete to authenticated
+  using (bucket_id = 'documents' and name like 'shop/%' and public.app_role() = 'admin');
+
+-- 5. Durcissements signalés par Supabase ---------------------------------------
+do $$ begin
+  if exists (select 1 from pg_proc where proname = 'bar_month_of' and pronamespace = 'public'::regnamespace) then
+    execute 'alter function public.bar_month_of(timestamptz) set search_path = ''''';
+  end if;
+  if exists (select 1 from pg_proc where proname = '_audit_immutable' and pronamespace = 'public'::regnamespace) then
+    execute 'alter function public._audit_immutable() set search_path = ''''';
+  end if;
+end $$;
+
+notify pgrst, 'reload schema';
+
+-- Vérification
+select
+  exists (select 1 from pg_proc where proname = 'set_shop_order_status')
+  and exists (select 1 from pg_proc where proname = 'quiz_today')
+  and exists (select 1 from pg_proc where proname = 'revenue_stats')
+  and not exists (select 1 from pg_policies where tablename = 'quiz_answers' and policyname = 'quiz_answers_all_read')
+  as "MISE A JOUR 28 OK";
+
 
 -- ===================== Vérification finale =====================
 notify pgrst, 'reload schema';
@@ -2869,6 +4208,10 @@ select
     and to_regclass('public.airfield_tips') is not null
     and exists (select 1 from pg_proc where proname = 'move_crew')
     and exists (select 1 from information_schema.columns where table_name = 'outings' and column_name = 'referent_instructor_id')
+    and to_regclass('public.shop_orders') is not null
+    and to_regclass('public.flight_shares') is not null
+    and exists (select 1 from pg_proc where proname = 'set_shop_order_status')
+    and exists (select 1 from pg_proc where proname = 'quiz_today')
   as "TOUT EST A JOUR",
   (select count(*) from public.profiles) as membres,
   (select string_agg(registration, ', ' order by registration) from public.aircraft) as avions,

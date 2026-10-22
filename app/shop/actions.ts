@@ -60,69 +60,32 @@ export async function placeOrder(formData: FormData) {
 // ── Annuler ma commande ──────────────────────────────────────────────────────
 
 export async function cancelOrder(orderId: string) {
-  const me = await requireMember();
+  await requireMember();
   const supabase = await createClient();
-
-  const { error } = await supabase
-    .from("shop_orders")
-    .update({ status: "cancelled" })
-    .eq("id", orderId)
-    .eq("user_id", me.id)
-    .in("status", ["pending"]);
-
-  if (error) redirect("/shop?erreur=Impossible+d'annuler+cette+commande");
+  // La base vérifie que la commande est bien la vôtre et encore « en attente »
+  const { error } = await supabase.rpc("cancel_shop_order", { p_id: orderId });
+  if (error) redirect(`/shop?erreur=${encodeURIComponent(error.message)}`);
 
   revalidatePath("/shop");
+  revalidatePath("/shop/admin");
   redirect("/shop?ok=Commande+annulee");
 }
 
 // ── Admin : mettre à jour le statut d'une commande ──────────────────────────
+// « delivered » débite l'ardoise du membre (une seule fois), dans la même opération.
 
 export async function updateOrderStatus(orderId: string, status: string) {
   await requireAdmin();
   const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_shop_order_status", { p_id: orderId, p_status: status });
+  if (error) redirect(`/shop/admin?erreur=${encodeURIComponent(error.message)}`);
 
-  // Si on passe en "delivered", on débite l'ardoise du membre
-  if (status === "delivered") {
-    // Récupérer les infos de la commande
-    const { data: orders } = await supabase
-      .from("shop_orders")
-      .select("user_id, item_name, price_cents, quantity, size, color, ardoise_charged")
-      .eq("id", orderId)
-      .limit(1);
-
-    const order = orders?.[0] ?? null;
-
-    if (order && !order.ardoise_charged && order.price_cents > 0) {
-      // Construire le libellé pour l'ardoise
-      const variant = [order.size, order.color].filter(Boolean).join(" / ");
-      const label = variant
-        ? `Shop – ${order.item_name} (${variant})`
-        : `Shop – ${order.item_name}`;
-
-      // Insérer dans bar_consumptions au nom du membre
-      const { error: barError } = await supabase.from("bar_consumptions").insert({
-        user_id: order.user_id,
-        product_name: label,
-        unit_price_cents: order.price_cents,
-        quantity: order.quantity,
-      });
-
-      if (!barError) {
-        // Marquer la commande comme débitée
-        await supabase
-          .from("shop_orders")
-          .update({ ardoise_charged: true })
-          .eq("id", orderId);
-      }
-    }
-  }
-
-  await supabase.from("shop_orders").update({ status }).eq("id", orderId);
-
+  revalidatePath("/shop");
   revalidatePath("/shop/admin");
+  revalidatePath("/bar");
   revalidatePath("/bar/tresorerie");
-  redirect("/shop/admin?ok=Statut+mis+a+jour");
+  const charged = (data as { charged?: boolean } | null)?.charged;
+  redirect(`/shop/admin?ok=${encodeURIComponent(charged ? "Commande livrée : montant ajouté à l'ardoise du membre." : "Statut mis à jour.")}`);
 }
 
 // ── Admin : créer/modifier un article ───────────────────────────────────────
@@ -156,11 +119,10 @@ export async function upsertItem(formData: FormData) {
     active,
   };
 
-  if (id) {
-    await supabase.from("shop_items").update(payload).eq("id", id);
-  } else {
-    await supabase.from("shop_items").insert(payload);
-  }
+  const { error } = id
+    ? await supabase.from("shop_items").update(payload).eq("id", id)
+    : await supabase.from("shop_items").insert(payload);
+  if (error) redirect(`/shop/admin?erreur=${encodeURIComponent(error.message)}`);
 
   revalidatePath("/shop");
   revalidatePath("/shop/admin");

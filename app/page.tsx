@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { getCurrentProfile, canOrganize } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Banner } from "@/components/Banner";
+import type { OutingSummary } from "@/lib/types";
 import { Clocks } from "@/components/Clocks";
 import { WeatherCard } from "@/components/WeatherCard";
 import { getMetar } from "@/lib/metar";
@@ -11,7 +12,7 @@ import { formatDate, formatTime, dayBadge } from "@/lib/dates";
 import { euros, currentMonthKey } from "@/lib/money";
 import { createAnnouncement, deleteAnnouncement } from "@/app/annonces/actions";
 import { SubmitButton } from "@/components/ui";
-import { QuizPopup } from "@/components/QuizPopup";
+import { QuizPopup, type DailyQuestion } from "@/components/QuizPopup";
 import { submitQuizAnswer } from "@/app/quiz/actions";
 
 export const metadata: Metadata = { title: `Accueil — ${CLUB_NAME}` };
@@ -28,26 +29,12 @@ export default async function Page({
   const supabase = await createClient();
   const metar = await getMetar();
 
-  // Sorties à venir
-  const { data: sortiesRaw } = approved
-    ? await supabase
-        .from("outings")
-        .select("id, title, destination, departure_at, status, kind, instructor:instructor_id(full_name)")
-        .eq("status", "open")
-        .gte("departure_at", new Date().toISOString())
-        .order("departure_at")
-        .limit(5)
-    : { data: [] };
-
-  // Mes inscriptions
-  const { data: myRegs } = approved && profile
-    ? await supabase
-        .from("registrations")
-        .select("outing_id, status")
-        .eq("user_id", profile.id)
-        .neq("status", "cancelled")
-    : { data: [] };
-  const myRegMap = new Map((myRegs ?? []).map((r: { outing_id: string; status: string }) => [r.outing_id, r.status]));
+  // Événements à venir (visibilité et compteurs calculés par la base)
+  const { data: upRaw } = approved ? await supabase.rpc("list_outings", { p_past: false }) : { data: [] };
+  const sorties = ((upRaw ?? []) as OutingSummary[])
+    .filter((o) => o.status === "open" && (!o.approval || o.approval === "approved"))
+    .slice(0, 5);
+  const myRegMap = new Map(sorties.map((o) => [o.id, o.my_status]));
 
   // Ardoise du mois
   const nowKey = currentMonthKey();
@@ -63,11 +50,9 @@ export default async function Page({
     0,
   );
 
-  // Membres actifs
-  const { count: membresActifs } = await supabase
-    .from("profiles")
-    .select("*", { count: "exact", head: true })
-    .in("role", ["member", "instructor", "admin"]);
+  // Membres actifs (un membre ne peut lire que sa propre fiche : on passe par la base)
+  const { data: stats } = approved ? await supabase.rpc("club_stats") : { data: null };
+  const membresActifs = (stats as { active_members?: number } | null)?.active_members ?? null;
 
   // Avions de la flotte
   const { data: flotteRaw } = await supabase
@@ -86,34 +71,13 @@ export default async function Page({
     .order("created_at", { ascending: false });
   const annonces = annoncesRaw ?? [];
 
-  // Meilleur équipage de l'année (bar)
-  const year = new Date().getFullYear();
-  const { data: equipageRaw } = await supabase
-    .from("bar_consumptions")
-    .select("user_id, quantity, unit_price_cents, profile:user_id(full_name)")
-    .gte("created_at", `${year}-01-01`);
-  const byUser = new Map<string, { name: string; total: number }>();
-  for (const c of equipageRaw ?? []) {
-    const p = c.profile as unknown as { full_name: string } | null;
-    const name = p?.full_name ?? "?";
-    const prev = byUser.get(c.user_id) ?? { name, total: 0 };
-    byUser.set(c.user_id, { ...prev, total: prev.total + c.unit_price_cents * c.quantity });
-  }
-  const topEquipage = [...byUser.values()].sort((a, b) => b.total - a.total).slice(0, 3);
-
-  const sorties = (sortiesRaw ?? []) as {
-    id: string;
-    title: string;
-    destination: string | null;
-    departure_at: string;
-    status: string;
-    kind: string | null;
-  }[];
+  // Équipage de l'année : top 3 du bar, en respectant ceux qui refusent d'apparaître au classement
+  const { data: rankRaw } = approved ? await supabase.rpc("bar_ranking", { p_year: null }) : { data: [] };
+  const topEquipage = (rankRaw ?? []) as { rank: number; name: string; consos: number; avatar_url: string | null }[];
 
   const KIND_ICON: Record<string, string> = { vol: "✈️", activite: "🏍️", evenement: "🥂" };
 
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
   const dateStr = now.toLocaleDateString("fr-FR", {
     timeZone: "Europe/Paris",
     weekday: "long",
@@ -122,28 +86,10 @@ export default async function Page({
     year: "numeric",
   });
 
-  // Question du jour : sélection déterministe par date
-  const { data: allQuestions } = approved && profile
-    ? await supabase
-        .from("quiz_questions")
-        .select("id, question, option_a, option_b, option_c, option_d, correct, explanation, category")
-        .eq("active", true)
-        .order("id")
-    : { data: [] };
-
-  const totalQ = allQuestions?.length ?? 0;
-  const dayOfYear = Math.floor((now.getTime() - Date.UTC(now.getUTCFullYear(), 0, 0)) / 86400000);
-  const dailyQuestion = totalQ > 0 ? allQuestions![dayOfYear % totalQ] : null;
-
-  const { data: todayAnswer } = dailyQuestion && profile
-    ? await supabase
-        .from("quiz_answers")
-        .select("id")
-        .eq("user_id", profile.id)
-        .eq("answered_on", today)
-        .maybeSingle()
-    : { data: null };
-  const alreadyAnswered = !!todayAnswer;
+  // Question du jour : choisie par la base (jour de Paris), sans la bonne réponse
+  const { data: quizRaw } = approved ? await supabase.rpc("quiz_today") : { data: null };
+  const dailyQuestion = quizRaw as DailyQuestion | null;
+  const alreadyAnswered = !!dailyQuestion?.already_answered;
 
   return (
     <>
@@ -334,10 +280,10 @@ export default async function Page({
           ) : (
             <ul className="divide-y divide-line">
               {topEquipage.map((m, i) => (
-                <li key={m.name} className="flex items-center gap-3 px-4 py-3 text-sm">
+                <li key={m.rank} className="flex items-center gap-3 px-4 py-3 text-sm">
                   <span className="text-xl" aria-hidden>{["🥇", "🥈", "🥉"][i]}</span>
                   <span className="min-w-0 flex-1 truncate font-medium text-ink">{m.name}</span>
-                  <span className="font-bold text-navy-2">{euros(m.total)}</span>
+                  <span className="font-bold text-navy-2">{m.consos} conso{m.consos > 1 ? "s" : ""}</span>
                 </li>
               ))}
             </ul>

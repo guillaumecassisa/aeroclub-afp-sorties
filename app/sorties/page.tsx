@@ -2,29 +2,14 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { requireMember, canOrganize } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { Banner } from "@/components/Banner";
+import { Banner, StatusPill } from "@/components/Banner";
 import { formatDate, formatTime, dayBadge } from "@/lib/dates";
+import type { OutingSummary } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Événements" };
 export const dynamic = "force-dynamic";
 
-const KIND_ICON: Record<string, string> = {
-  vol: "✈️",
-  activite: "🏍️",
-  evenement: "🥂",
-};
-
-type Outing = {
-  id: string;
-  title: string;
-  destination: string | null;
-  departure_at: string;
-  return_at: string | null;
-  status: string;
-  kind: string | null;
-  max_participants: number | null;
-  instructor: { full_name: string } | null;
-};
+const KIND_ICON: Record<string, string> = { vol: "✈️", activite: "🏍️", evenement: "🥂" };
 
 export default async function Page({
   searchParams,
@@ -35,43 +20,46 @@ export default async function Page({
   const sp = await searchParams;
   const supabase = await createClient();
 
-  const { data } = await supabase
-    .from("outings")
-    .select("id, title, destination, departure_at, return_at, status, kind, max_participants, instructor:instructor_id(full_name)")
-    .order("departure_at", { ascending: true });
-
-  // Get user registrations
-  const { data: myRegs } = await supabase
-    .from("registrations")
-    .select("outing_id, status")
-    .eq("user_id", me.id)
-    .neq("status", "cancelled");
-
-  const myRegMap = new Map((myRegs ?? []).map((r) => [r.outing_id, r.status]));
-
-  const outings = (data ?? []) as unknown as Outing[];
-  const now = new Date();
-  const upcoming = outings.filter((o) => o.status === "open" && new Date(o.departure_at) >= now);
-  const past = outings.filter((o) => o.status !== "open" || new Date(o.departure_at) < now);
+  // list_outings applique la visibilité : publiés pour tous, propositions pour leur auteur et les organisateurs
+  const [{ data: up, error }, { data: pastRaw }] = await Promise.all([
+    supabase.rpc("list_outings", { p_past: false }),
+    supabase.rpc("list_outings", { p_past: true }),
+  ]);
+  const all = (up ?? []) as OutingSummary[];
+  const toReview = all.filter((o) => o.approval && o.approval !== "approved" && o.status === "open");
+  const upcoming = all.filter((o) => (!o.approval || o.approval === "approved") && o.status === "open");
+  const cancelled = all.filter((o) => o.status === "cancelled");
+  const past = [...cancelled, ...((pastRaw ?? []) as OutingSummary[])].slice(0, 30);
 
   const organizer = canOrganize(me);
 
   return (
     <>
-      <Banner ok={sp.ok} erreur={sp.erreur} />
+      <Banner ok={sp.ok} erreur={sp.erreur ?? error?.message} />
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-navy-2">Événements</h1>
-          <p className="text-sm text-muted">Sorties, activités et événements du club.</p>
+          <p className="text-sm text-muted">Sorties, activités et événements du club. Places attribuées dans l&apos;ordre d&apos;inscription.</p>
         </div>
-        {organizer && (
-          <Link href="/sorties/nouvelle" className="btn-primary">
-            + Créer
-          </Link>
-        )}
+        <Link href="/sorties/nouvelle" className="btn-primary">
+          {organizer ? "+ Créer" : "+ Proposer un événement"}
+        </Link>
       </div>
 
-      {upcoming.length === 0 && past.length === 0 && (
+      {toReview.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">
+            {organizer ? "Propositions à valider" : "Mes propositions"}
+          </h2>
+          <div className="space-y-3">
+            {toReview.map((o) => (
+              <OutingCard key={o.id} outing={o} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {upcoming.length === 0 && past.length === 0 && toReview.length === 0 && (
         <div className="card p-8 text-center text-muted">Aucun événement pour le moment.</div>
       )}
 
@@ -80,7 +68,7 @@ export default async function Page({
           <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">À venir</h2>
           <div className="space-y-3">
             {upcoming.map((o) => (
-              <OutingCard key={o.id} outing={o} myStatus={myRegMap.get(o.id)} />
+              <OutingCard key={o.id} outing={o} />
             ))}
           </div>
         </section>
@@ -91,7 +79,7 @@ export default async function Page({
           <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">Passés / annulés</h2>
           <div className="space-y-3">
             {past.map((o) => (
-              <OutingCard key={o.id} outing={o} myStatus={myRegMap.get(o.id)} muted />
+              <OutingCard key={o.id} outing={o} muted />
             ))}
           </div>
         </section>
@@ -100,9 +88,17 @@ export default async function Page({
   );
 }
 
-function OutingCard({ outing: o, myStatus, muted }: { outing: Outing; myStatus?: string; muted?: boolean }) {
+function places(o: OutingSummary) {
+  if (o.total_capacity == null) return `${o.confirmed_count} inscrit(s)`;
+  const left = Math.max(o.total_capacity - o.confirmed_count, 0);
+  if (left === 0) return o.waitlist_count ? `Complet · ${o.waitlist_count} en attente` : "Complet";
+  return `${left} place${left > 1 ? "s" : ""} libre${left > 1 ? "s" : ""} sur ${o.total_capacity}`;
+}
+
+function OutingCard({ outing: o, muted }: { outing: OutingSummary; muted?: boolean }) {
   const badge = dayBadge(o.departure_at);
   const icon = KIND_ICON[o.kind ?? "vol"] ?? "✈️";
+  const cancelled = o.status === "cancelled";
   return (
     <Link
       href={`/sorties/${o.id}`}
@@ -119,14 +115,19 @@ function OutingCard({ outing: o, myStatus, muted }: { outing: Outing; myStatus?:
           <p className="font-semibold text-ink">
             <span aria-hidden>{icon}</span> {o.title}
           </p>
-          {o.status === "cancelled" && <span className="pill bg-danger-soft text-danger">Annulé</span>}
-          {myStatus === "confirmed" && o.status !== "cancelled" && <span className="pill bg-ok-soft text-ok">Inscrit ✓</span>}
-          {myStatus === "waitlist" && <span className="pill bg-wait-soft text-wait">Liste d&apos;attente</span>}
+          <div className="flex flex-wrap gap-1">
+            {cancelled && <span className="pill bg-danger-soft text-danger">Annulé</span>}
+            {o.approval === "pending" && !cancelled && <span className="pill bg-wait-soft text-wait">À valider</span>}
+            {o.approval === "rejected" && !cancelled && <span className="pill bg-danger-soft text-danger">Refusée</span>}
+            {!cancelled && <StatusPill status={o.my_status} />}
+          </div>
         </div>
         {o.destination && <p className="text-sm text-muted">{o.destination}</p>}
         <p className="mt-1 text-xs text-muted">
-          {formatDate(o.departure_at)} · {formatTime(o.departure_at)}
+          {formatDate(o.departure_at)} · {formatTime(o.departure_at)} · par {o.instructor_name}
+          {!cancelled && !muted && <> · {places(o)}</>}
         </p>
+        {o.aircraft_summary && <p className="mt-0.5 text-xs text-muted">{o.aircraft_summary}</p>}
       </div>
     </Link>
   );
