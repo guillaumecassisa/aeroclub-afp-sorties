@@ -46,7 +46,7 @@ export default async function QuizPage() {
   for (const row of leaderRaw ?? []) {
     const uid = row.user_id;
     if (!byUser.has(uid)) {
-      const p = (row as { profiles?: { full_name: string | null; avatar_url: string | null } | null }).profiles;
+            const p = (row as unknown as { profiles?: { full_name: string | null; avatar_url: string | null } | null }).profiles;
       byUser.set(uid, {
         user_id: uid,
         full_name: p?.full_name ?? null,
@@ -157,7 +157,7 @@ export default async function QuizPage() {
           <h2 className="text-lg font-semibold text-navy-2 mb-3">📅 Mes réponses récentes</h2>
           <div className="divide-y divide-line rounded-2xl border border-line overflow-hidden">
             {myAnswers?.map((a) => {
-              const q = (a as { quiz_questions?: { question: string; category: string; correct: string } | null }).quiz_questions;
+                            const q = (a as unknown as { quiz_questions?: { question: string; category: string; correct: string } | null }).quiz_questions;
               return (
                 <div key={`${a.question_id}-${a.answered_on}`} className="flex items-start gap-3 px-4 py-3 bg-white">
                   <span className="shrink-0 text-base mt-0.5">{a.is_correct ? "✅" : "❌"}</span>
