@@ -82,6 +82,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 {profile?.role === "admin" && <NavLink href="/droits">Gestion des droits</NavLink>}
                 <span className="ml-auto" aria-hidden />
                 <NavLink href="/shareflight">Shareflight</NavLink>
+                <NavLink href="/quiz">Quiz</NavLink>
                 <NavLink href="/annuaire">Annuaire</NavLink>
               </div>
             </nav>
