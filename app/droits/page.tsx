@@ -49,6 +49,18 @@ const FUNCTIONS: Fn[] = [
     text: "Accès à « Flotte (maintenance) » (disponibilité des avions) et gestion des documents.",
     has: (m) => !!m.is_maintenance,
   },
+  {
+    key: "chef_pilote",
+    label: "Chef pilote",
+    text: "Publie dans l'Espace pédagogique (documents, annonces), analyse les REX, organise des formations.",
+    has: (m) => !!m.is_chief_pilot,
+  },
+  {
+    key: "conformite",
+    label: "Resp. conformité",
+    text: "Mêmes droits que le chef pilote dans l'Espace pédagogique (documents, annonces, REX, formations).",
+    has: (m) => !!m.is_compliance,
+  },
 ];
 
 const nameOf = (m: Profile) => m.full_name || m.email;

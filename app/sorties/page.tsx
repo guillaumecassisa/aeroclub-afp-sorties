@@ -9,7 +9,7 @@ import type { OutingSummary } from "@/lib/types";
 export const metadata: Metadata = { title: "Événements" };
 export const dynamic = "force-dynamic";
 
-const KIND_ICON: Record<string, string> = { vol: "✈️", activite: "🏍️", evenement: "🥂" };
+const KIND_ICON: Record<string, string> = { vol: "✈️", activite: "🏍️", evenement: "🥂", formation: "🎓" };
 
 export default async function Page({
   searchParams,

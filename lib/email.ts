@@ -180,6 +180,7 @@ const KIND_MAIL: Record<string, { icon: string; label: string }> = {
   vol: { icon: "✈️", label: "Nouvelle sortie avion" },
   activite: { icon: "🏍️", label: "Nouvelle activité" },
   evenement: { icon: "🥂", label: "Nouvel événement" },
+  formation: { icon: "🎓", label: "Nouvelle séance de formation" },
 };
 
 export type PublishedEvent = {
@@ -231,4 +232,26 @@ export async function notifyEventPublished(
   for (let i = 0; i < emails.length; i += 45) {
     await send({ bcc: emails.slice(i, i + 45), subject, text });
   }
+}
+
+/** Prévient le chef pilote et le responsable conformité qu'un REX vient d'être déposé. */
+export async function notifyRexSubmitted(
+  reviewers: { email: string; full_name: string }[] | null | undefined,
+  title: string,
+  author: string | null,
+) {
+  if (!reviewers?.length) return;
+  const url = SITE_URL ? `${SITE_URL}/pedagogie?onglet=rex` : "(Espace pédagogique, onglet REX)";
+  await sendAll(
+    reviewers
+      .filter((r) => r.email)
+      .map((r) => ({
+        to: r.email,
+        subject: `🛡️ Nouveau retour d'expérience : ${title}`,
+        text:
+          `Bonjour ${r.full_name || ""},\n\n` +
+          `Un nouveau REX a été déposé ${author ? `par ${author}` : "de façon anonyme"} : « ${title} ».\n\n` +
+          `${url}\n\n— ${CLUB_NAME}`,
+      })),
+  );
 }

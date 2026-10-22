@@ -26,6 +26,7 @@ const KINDS: { kind: OutingKind; label: string; hint: string; icon: string }[] =
   { kind: "vol", label: "Sortie avion", hint: "Navigation, sortie club : on attribue des avions", icon: "✈️" },
   { kind: "activite", label: "Activité", hint: "Sans avion : moto, randonnée, visite…", icon: "🏍️" },
   { kind: "evenement", label: "Événement convivial", hint: "Apéro, barbecue, dîner, soirée…", icon: "🥂" },
+  { kind: "formation", label: "Formation", hint: "Briefing, soirée théorique, révision, sécurité…", icon: "🎓" },
 ];
 
 export function OutingForm({
@@ -60,7 +61,7 @@ export function OutingForm({
       <fieldset className="card p-5">
         <legend className="sr-only">Type</legend>
         <h2 className="mb-3 font-bold text-navy-2">Type d&apos;événement</h2>
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           {KINDS.map((k) => (
             <button
               key={k.kind}

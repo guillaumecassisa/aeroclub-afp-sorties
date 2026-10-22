@@ -22,6 +22,8 @@ export type Profile = {
   is_secretary?: boolean;
   is_maintenance?: boolean;
   is_board?: boolean;
+  is_chief_pilot?: boolean;
+  is_compliance?: boolean;
   is_instructor?: boolean;
   notify_events?: boolean;
   show_phone?: boolean;
@@ -69,12 +71,13 @@ export type OutingSummary = {
   rejection_reason?: string | null;
 };
 
-export type OutingKind = "vol" | "activite" | "evenement";
+export type OutingKind = "vol" | "activite" | "evenement" | "formation";
 
 export const KIND_LABELS: Record<OutingKind, string> = {
   vol: "Sortie avion",
   activite: "Activité",
   evenement: "Événement convivial",
+  formation: "Formation",
 };
 
 export type Approval = "pending" | "approved" | "rejected";

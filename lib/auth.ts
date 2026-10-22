@@ -43,6 +43,8 @@ export function canOrganize(p: Profile | null) {
     p.role === "instructor" ||
     p.role === "admin" ||
     !!p.is_board ||
+    !!p.is_chief_pilot ||
+    !!p.is_compliance ||
     !!p.is_treasurer ||
     !!p.is_secretary ||
     !!p.is_maintenance
@@ -52,6 +54,17 @@ export function canOrganize(p: Profile | null) {
 export async function requireAdmin(): Promise<Profile> {
   const profile = await requireMember();
   if (profile.role !== "admin") redirect("/?erreur=" + encodeURIComponent("Accès réservé aux administrateurs."));
+  return profile;
+}
+
+/** Publie dans l'Espace pédagogique : administrateurs, chef pilote, responsable conformité. */
+export function canTeach(p: Profile | null) {
+  return !!p && (p.role === "admin" || (p.role !== "pending" && (!!p.is_chief_pilot || !!p.is_compliance)));
+}
+
+export async function requireTeacher(): Promise<Profile> {
+  const profile = await requireMember();
+  if (!canTeach(profile)) redirect("/pedagogie?erreur=" + encodeURIComponent("Réservé au chef pilote et au responsable conformité."));
   return profile;
 }
 

@@ -75,7 +75,7 @@ export default async function Page({
   const { data: rankRaw } = approved ? await supabase.rpc("bar_ranking", { p_year: null }) : { data: [] };
   const topEquipage = (rankRaw ?? []) as { rank: number; name: string; consos: number; avatar_url: string | null }[];
 
-  const KIND_ICON: Record<string, string> = { vol: "✈️", activite: "🏍️", evenement: "🥂" };
+  const KIND_ICON: Record<string, string> = { vol: "✈️", activite: "🏍️", evenement: "🥂", formation: "🎓" };
 
   const now = new Date();
   const dateStr = now.toLocaleDateString("fr-FR", {

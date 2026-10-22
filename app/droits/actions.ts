@@ -25,6 +25,8 @@ const FUNCTION_MSG: Record<string, [string, string]> = {
   tresorier: ["est maintenant trésorier.", "n'est plus trésorier."],
   secretaire: ["est maintenant secrétaire (droits administrateur complets).", "n'est plus secrétaire."],
   maintenance: ["est maintenant responsable maintenance.", "n'est plus responsable maintenance."],
+  chef_pilote: ["est maintenant chef pilote.", "n'est plus chef pilote."],
+  conformite: ["est maintenant responsable conformité.", "n'est plus responsable conformité."],
 };
 
 async function applyFunction(userId: string, fn: string, value: boolean) {

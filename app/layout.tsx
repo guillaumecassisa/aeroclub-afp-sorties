@@ -71,6 +71,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               <div className="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-2 text-sm">
                 <NavLink href="/" exact>Accueil</NavLink>
                 <NavLink href="/sorties">Événements</NavLink>
+                <NavLink href="/pedagogie">Espace pédagogique</NavLink>
                 <NavLink href="/preparer-son-vol">Préparer son vol</NavLink>
                 <NavLink href="/bons-plans">Bons plans</NavLink>
                 <NavLink href="/shop">Le shop</NavLink>

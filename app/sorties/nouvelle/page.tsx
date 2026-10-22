@@ -3,12 +3,14 @@ import Link from "next/link";
 import { requireMember, canOrganize } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { OutingForm } from "@/components/OutingForm";
-import type { Aircraft } from "@/lib/types";
+import type { Aircraft, OutingKind } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Nouvel événement" };
 
-export default async function Page() {
+export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const me = await requireMember();
+  const sp = await searchParams;
+  const kind: OutingKind = (["vol", "activite", "evenement", "formation"] as const).find((k) => k === sp.type) ?? "vol";
   const organizer = canOrganize(me);
 
   const supabase = await createClient();
@@ -31,6 +33,7 @@ export default async function Page() {
       <OutingForm
         fleet={fleet}
         initial={{
+          kind,
           title: "",
           destination: "",
           meeting_point: "",
