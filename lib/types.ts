@@ -90,6 +90,9 @@ export type Person = {
   avatar_url?: string | null;
   released?: boolean;
   weight_kg?: number | null;
+  /** Accompagnant (+1) amené par un membre */
+  is_guest?: boolean;
+  host_name?: string | null;
 };
 
 export type OutingDetail = {
@@ -125,6 +128,11 @@ export type OutingDetail = {
   }[];
   waitlist: (Person & { position: number })[];
   my_registration: { id: string; status: RegStatus; aircraft_id: string | null } | null;
+  guests_allowed?: boolean;
+  /** Sortie avion : mon accompagnant */
+  my_guest?: { id: string; name: string; weight_kg: number | null; status: RegStatus; aircraft_id: string | null } | null;
+  /** Événement sans avion : nombre d'accompagnants annoncés */
+  my_guest_count?: number;
 };
 
 export type SeatChange = {

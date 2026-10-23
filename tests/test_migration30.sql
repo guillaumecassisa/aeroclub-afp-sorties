@@ -108,4 +108,83 @@ do $$ begin
   assert (public.register_for_outing(current_setting('t.o2')::uuid) ->> 'status') = 'confirmed', 'non lâché avec organisateur instructeur';
 end $$;
 
+-- ===== Accompagnants : sortie avion =====
+-- Sortie DR400 (4 places), organisateur admin non instructeur, +1 autorisés
+select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001', false);
+select set_config('t.o3', (public.save_outing(null, 'Test +1', 'LFMQ', null, null, now() + interval '22 days', null, null,
+  array['30000000-0000-0000-0000-0000000000d4']::uuid[], null, 'vol', null) ->> 'outing_id'), false);
+-- interdit tant que l'organisateur ne l'a pas autorisé
+select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000005', false);
+select public.register_for_outing(current_setting('t.o3')::uuid);
+do $$ begin
+  begin perform public.add_guest(current_setting('t.o3')::uuid, 'Marie', 60); raise exception 'ATTENDU';
+  exception when others then if sqlerrm = 'ATTENDU' then raise; end if; assert sqlerrm like '%n''autorise pas%', sqlerrm; end;
+end $$;
+select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001', false);
+select public.set_guests_allowed(current_setting('t.o3')::uuid, true);
+-- le lâché DR400 ajoute un accompagnant (non lâché, mais il ne pilote pas)
+select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000005', false);
+do $$ begin
+  assert (public.add_guest(current_setting('t.o3')::uuid, 'Marie', 60) ->> 'status') = 'confirmed', '+1 confirmé';
+  begin perform public.add_guest(current_setting('t.o3')::uuid, 'Paul', 80); raise exception 'ATTENDU';
+  exception when others then if sqlerrm = 'ATTENDU' then raise; end if; assert sqlerrm like '%déjà un accompagnant%', sqlerrm; end;
+  -- get_outing : nom de l'accompagnant, son poids visible par le membre, pas de badge « non lâché »
+  assert jsonb_path_exists(public.get_outing(current_setting('t.o3')::uuid),
+    '$.aircraft[*].occupants[*] ? (@.full_name == "Marie" && @.is_guest == true && @.released == true && @.weight_kg == 60)'), 'accompagnant affiché';
+  assert (public.get_outing(current_setting('t.o3')::uuid) -> 'my_registration' ->> 'status') = 'confirmed', 'mon inscription, pas celle du +1';
+  assert (select my_status from jsonb_to_recordset(public.list_outings(false)) as x(id uuid, my_status text)
+           where id = current_setting('t.o3')::uuid) = 'confirmed', 'list_outings ne plante pas avec un +1';
+end $$;
+-- un non lâché sans instructeur reste en attente ; son +1 aussi
+select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000002', false);
+select public.register_for_outing(current_setting('t.o3')::uuid);
+do $$ begin
+  assert (public.add_guest(current_setting('t.o3')::uuid, 'Léa', 55) ->> 'status') = 'waitlist', '+1 en attente avec son membre';
+end $$;
+-- le membre se désinscrit : son +1 part avec lui
+select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000005', false);
+select public.cancel_registration((select id from public.registrations where outing_id = current_setting('t.o3')::uuid
+  and user_id = '30000000-0000-0000-0000-000000000005' and guest_of is null));
+do $$ begin
+  assert not exists (select 1 from public.registrations where outing_id = current_setting('t.o3')::uuid
+                       and guest_name = 'Marie' and status <> 'cancelled'), '+1 annulé avec son membre';
+end $$;
+-- l'organisateur retire l'autorisation : les +1 restants sont retirés
+select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001', false);
+select public.set_guests_allowed(current_setting('t.o3')::uuid, false);
+do $$ begin
+  assert not exists (select 1 from public.registrations where outing_id = current_setting('t.o3')::uuid
+                       and guest_of is not null and status <> 'cancelled'), '+1 retirés';
+end $$;
+
+-- ===== Accompagnants : événement convivial (jusqu'à 5) =====
+select set_config('t.o4', (public.save_outing(null, 'Barbapéro', 'Club-house', null, null, now() + interval '23 days', null, null,
+  null, null, 'evenement', 6) ->> 'outing_id'), false);
+select public.set_guests_allowed(current_setting('t.o4')::uuid, true);
+select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000003', false);
+select public.register_for_outing(current_setting('t.o4')::uuid);
+do $$
+declare r jsonb;
+begin
+  begin perform public.set_guest_count(current_setting('t.o4')::uuid, 6); raise exception 'ATTENDU';
+  exception when others then if sqlerrm = 'ATTENDU' then raise; end if; assert sqlerrm like '%0 et 5%', sqlerrm; end;
+  r := public.set_guest_count(current_setting('t.o4')::uuid, 5);
+  assert (r ->> 'confirmed')::int = 5, '5 accompagnants confirmés (6 places)';
+  assert (public.get_outing(current_setting('t.o4')::uuid) ->> 'my_guest_count')::int = 5, 'compteur';
+end $$;
+-- un autre membre : l'événement est complet (1 + 5 = 6) -> liste d'attente, et ses +1 aussi
+select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000005', false);
+do $$ begin
+  assert (public.register_for_outing(current_setting('t.o4')::uuid) ->> 'status') = 'waitlist', 'complet';
+  assert (public.set_guest_count(current_setting('t.o4')::uuid, 2) ->> 'confirmed')::int = 0, '+1 en attente avec leur membre';
+end $$;
+-- le premier réduit à 2 accompagnants : le second membre et ses 2 +1 passent
+select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000003', false);
+select public.set_guest_count(current_setting('t.o4')::uuid, 2);
+do $$ begin
+  assert (select count(*) from public.registrations where outing_id = current_setting('t.o4')::uuid and status = 'confirmed') = 6, '6 confirmés';
+  assert (select status from public.registrations where outing_id = current_setting('t.o4')::uuid
+            and user_id = '30000000-0000-0000-0000-000000000005' and guest_of is null) = 'confirmed', 'second membre confirmé';
+end $$;
+
 select 'test_migration30 OK';

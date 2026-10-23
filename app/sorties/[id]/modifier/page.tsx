@@ -42,6 +42,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           aircraft: o.aircraft.map((a) => a.id),
           instructor_aircraft: o.instructor_aircraft_id,
           max_participants: o.max_participants,
+          guests_allowed: !!o.guests_allowed,
           registered_count: registered,
         }}
         submitLabel="Enregistrer"

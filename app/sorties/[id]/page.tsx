@@ -9,12 +9,14 @@ import { SubmitButton } from "@/components/ui";
 import { formatDateTime } from "@/lib/dates";
 import { KIND_LABELS, type OutingDetail, type OutingKind, type Person } from "@/lib/types";
 import {
+  addGuest,
   addMember,
   cancelOuting,
   cancelRegistration,
   moveCrew,
   registerSelf,
   reviewOuting,
+  setGuestCount,
   withdrawProposal,
 } from "../actions";
 
@@ -189,7 +191,11 @@ export default async function Page({
                     </form>
                   )}
                 </div>
-              ) : isMeOrganizerOnboard ? (
+              ) : null}
+              {mine && o.guests_allowed && !started && (
+                <GuestBox o={o} isFlight={isFlight} outingId={id} />
+              )}
+              {mine ? null : isMeOrganizerOnboard ? (
                 <p className="text-sm text-muted">Vous êtes à bord en tant qu&apos;organisateur.</p>
               ) : canRegister ? (
                 <form action={registerSelf.bind(null, id)} className="flex flex-wrap items-center justify-between gap-3">
@@ -330,6 +336,7 @@ function PersonRow({
           {p.phone}
         </a>
       )}
+      {p.is_guest && <span className="pill bg-paper text-muted">accompagnant{p.host_name ? ` de ${p.host_name}` : ""}</span>}
       {p.weight_kg != null && <span className="text-xs text-muted">{p.weight_kg} kg</span>}
       {children}
       {canRemove && (
@@ -376,6 +383,62 @@ function MoveForm({ outingId, who, from, o }: { outingId: string; who: string; f
       <SubmitButton className="btn-secondary px-2 py-1 text-xs" pending="…">
         OK
       </SubmitButton>
+    </form>
+  );
+}
+
+/** Mes accompagnants : 1 (nom + poids) pour une sortie avion, 0 à 5 pour un événement sans avion. */
+function GuestBox({ o, isFlight, outingId }: { o: OutingDetail; isFlight: boolean; outingId: string }) {
+  if (isFlight) {
+    const g = o.my_guest;
+    return (
+      <div className="mt-4 border-t border-line pt-4">
+        {g ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+            <p className="text-ink">
+              Votre accompagnant : <strong>{g.name}</strong>
+              {g.weight_kg != null && <> ({g.weight_kg} kg)</>} —{" "}
+              {g.status === "confirmed" ? "place confirmée" : "en liste d'attente"}.
+            </p>
+            <form action={cancelRegistration.bind(null, outingId, g.id, true)}>
+              <SubmitButton className="btn-secondary text-danger" pending="…" confirm={`Retirer ${g.name} ?`}>
+                Retirer
+              </SubmitButton>
+            </form>
+          </div>
+        ) : (
+          <form action={addGuest.bind(null, outingId)} className="flex flex-wrap items-end gap-2">
+            <div className="min-w-48 flex-1">
+              <label htmlFor="guest_name" className="label">Ajouter un accompagnant (+1, ne pilote pas)</label>
+              <input id="guest_name" name="guest_name" className="field" placeholder="Prénom et nom" required maxLength={120} />
+            </div>
+            <div className="w-28">
+              <label htmlFor="guest_weight" className="label">Poids (kg)</label>
+              <input id="guest_weight" name="guest_weight" className="field" inputMode="decimal" placeholder="75" required />
+            </div>
+            <SubmitButton className="btn-secondary" pending="…">Ajouter</SubmitButton>
+            <p className="w-full text-xs text-muted">
+              Il/elle prend un siège libre, après vous. Le poids sert au calcul de masse et centrage. Une participation pourra être demandée.
+            </p>
+          </form>
+        )}
+      </div>
+    );
+  }
+  const n = o.my_guest_count ?? 0;
+  return (
+    <form action={setGuestCount.bind(null, outingId)} className="mt-4 flex flex-wrap items-end gap-2 border-t border-line pt-4">
+      <div>
+        <label htmlFor="guests" className="label">Je viens avec</label>
+        <select id="guests" name="guests" className="field" defaultValue={String(n)}>
+          {[0, 1, 2, 3, 4, 5].map((k) => (
+            <option key={k} value={k}>
+              {k === 0 ? "personne (je viens seul·e)" : `${k} accompagnant${k > 1 ? "s" : ""}`}
+            </option>
+          ))}
+        </select>
+      </div>
+      <SubmitButton className="btn-secondary" pending="…">Enregistrer</SubmitButton>
     </form>
   );
 }

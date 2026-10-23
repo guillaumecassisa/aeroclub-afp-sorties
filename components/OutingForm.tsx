@@ -20,6 +20,7 @@ export type OutingFormValues = {
   instructor_aircraft: string | null;
   max_participants?: number | null;
   registered_count?: number;
+  guests_allowed?: boolean;
 };
 
 const KINDS: { kind: OutingKind; label: string; hint: string; icon: string }[] = [
@@ -236,6 +237,28 @@ export function OutingForm({
               Laissez vide si le nombre n&apos;est pas limité. Sinon, les inscrits au-delà passent en liste d&apos;attente.
             </p>
           </div>
+        </fieldset>
+      )}
+
+      {kind !== "formation" && (
+        <fieldset className="card p-5">
+          <legend className="sr-only">Accompagnants</legend>
+          <label className="flex items-start gap-3">
+            <input
+              type="checkbox"
+              name="guests_allowed"
+              defaultChecked={!!initial.guests_allowed}
+              className="mt-0.5 h-4 w-4 accent-sky"
+            />
+            <span>
+              <span className="block font-semibold text-navy-2">Accompagnants autorisés (+1)</span>
+              <span className="block text-xs text-muted">
+                {isFlight
+                  ? "Chaque inscrit peut ajouter une personne qui ne pilote pas (nom et poids). Elle prend un siège libre et une participation pourra lui être demandée."
+                  : "Chaque inscrit peut annoncer jusqu'à 5 accompagnants : vous connaissez le nombre exact de personnes. Ils comptent dans les places."}
+              </span>
+            </span>
+          </label>
         </fieldset>
       )}
 

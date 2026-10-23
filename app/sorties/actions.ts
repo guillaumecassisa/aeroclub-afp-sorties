@@ -87,6 +87,7 @@ export async function saveOuting(_prev: FormState, formData: FormData): Promise<
   const aircraft = kind === "vol" ? formData.getAll("aircraft").map(String).filter(Boolean) : [];
   let instructorAircraft = flies ? String(formData.get("instructor_aircraft") ?? "").trim() || null : null;
   if (instructorAircraft && !aircraft.includes(instructorAircraft)) instructorAircraft = aircraft[0] ?? null;
+  const guestsAllowed = kind !== "formation" && formData.get("guests_allowed") === "on";
   const maxRaw = String(formData.get("max_participants") ?? "").trim();
   const max = kind !== "vol" && maxRaw ? Number(maxRaw) : null;
 
@@ -121,6 +122,14 @@ export async function saveOuting(_prev: FormState, formData: FormData): Promise<
   };
   const info: OutingInfo = { id: res.outing_id, title, departure_at };
   await notifySeatChanges(res.changes, info);
+
+  // Accompagnants autorisés ou non (s'ils sont interdits, ceux déjà annoncés sont retirés)
+  const { data: g, error: gErr } = await supabase.rpc("set_guests_allowed", {
+    p_outing: res.outing_id,
+    p_allowed: guestsAllowed,
+  });
+  if (gErr) return { error: gErr.message };
+  await notifySeatChanges(((g as { changes?: SeatChange[] } | null)?.changes ?? []) as SeatChange[], info);
 
   let msg: string;
   if (res.approval !== "approved") {
@@ -260,4 +269,49 @@ export async function moveCrew(outingId: string, formData: FormData) {
   });
   if (error) back(outingId, "erreur", error.message);
   back(outingId, "ok", withWho ? "Places échangées." : "Équipage modifié.");
+}
+
+// ── Accompagnants ────────────────────────────────────────────────────────────
+
+/** Sortie avion : ajoute l'accompagnant du membre (ne pilote pas). */
+export async function addGuest(outingId: string, formData: FormData) {
+  await requireMember();
+  const name = String(formData.get("guest_name") ?? "").trim().slice(0, 120);
+  const wRaw = String(formData.get("guest_weight") ?? "").trim().replace(",", ".");
+  const weight = wRaw ? Number(wRaw) : null;
+  if (!name) back(outingId, "erreur", "Indiquez le nom de votre accompagnant.");
+  if (weight !== null && (!Number.isFinite(weight) || weight < 2 || weight > 250)) back(outingId, "erreur", "Poids invalide.");
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("add_guest", { p_outing: outingId, p_name: name, p_weight: weight });
+  if (error) back(outingId, "erreur", error.message);
+  const res = data as { status: string; changes?: SeatChange[] };
+  const info = await outingInfo(outingId);
+  if (info) await notifySeatChanges(res.changes ?? [], info);
+  back(
+    outingId,
+    "ok",
+    res.status === "confirmed"
+      ? `${name} a une place. Une participation pourra lui être demandée.`
+      : `${name} est en liste d'attente : il/elle aura une place dès qu'un siège se libère (et si vous en avez une).`,
+  );
+}
+
+/** Événement sans avion : nombre d'accompagnants annoncés (0 à 5). */
+export async function setGuestCount(outingId: string, formData: FormData) {
+  await requireMember();
+  const n = Math.max(0, Math.min(5, Number(formData.get("guests") ?? 0) || 0));
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_guest_count", { p_outing: outingId, p_count: n });
+  if (error) back(outingId, "erreur", error.message);
+  const res = data as { confirmed: number; waitlist: number; changes?: SeatChange[] };
+  const info = await outingInfo(outingId);
+  if (info) await notifySeatChanges(res.changes ?? [], info);
+  back(
+    outingId,
+    "ok",
+    n === 0
+      ? "Vous venez seul(e) : c'est noté."
+      : `C'est noté : vous venez avec ${n} accompagnant${n > 1 ? "s" : ""}` +
+          (res.waitlist ? ` (${res.waitlist} en liste d'attente faute de place).` : "."),
+  );
 }
