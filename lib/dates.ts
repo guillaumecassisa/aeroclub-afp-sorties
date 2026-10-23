@@ -42,7 +42,11 @@ export function isoToParisLocal(iso: string | null | undefined): string {
   return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
 }
 
-export function formatDate(iso: string) {
+/** Libellé d'un projet d'événement dont la date n'est pas encore fixée. */
+export const DATE_TBD = "Date à définir";
+
+export function formatDate(iso: string | null | undefined) {
+  if (!iso) return DATE_TBD;
   return new Intl.DateTimeFormat("fr-FR", {
     timeZone: TZ,
     weekday: "long",
@@ -52,13 +56,15 @@ export function formatDate(iso: string) {
   }).format(new Date(iso));
 }
 
-export function formatTime(iso: string) {
+export function formatTime(iso: string | null | undefined) {
+  if (!iso) return "";
   return new Intl.DateTimeFormat("fr-FR", { timeZone: TZ, hour: "2-digit", minute: "2-digit" }).format(
     new Date(iso),
   );
 }
 
-export function formatDateTime(iso: string) {
+export function formatDateTime(iso: string | null | undefined) {
+  if (!iso) return DATE_TBD.toLowerCase();
   return `${formatDate(iso)} à ${formatTime(iso)}`;
 }
 
@@ -73,8 +79,14 @@ export function formatShort(iso: string) {
   }).format(new Date(iso));
 }
 
+/** « samedi 4 octobre 2026 · 09:00 », ou « Date à définir » pour un projet. */
+export function formatWhen(iso: string | null | undefined) {
+  return iso ? `${formatDate(iso)} · ${formatTime(iso)}` : DATE_TBD;
+}
+
 /** Jour et mois pour la pastille calendrier */
-export function dayBadge(iso: string) {
+export function dayBadge(iso: string | null | undefined) {
+  if (!iso) return { day: "?", month: "à fixer", weekday: "date" };
   const d = new Date(iso);
   return {
     day: new Intl.DateTimeFormat("fr-FR", { timeZone: TZ, day: "numeric" }).format(d),

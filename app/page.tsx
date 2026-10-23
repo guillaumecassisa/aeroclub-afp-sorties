@@ -248,7 +248,11 @@ export default async function Page({
                 return (
                   <li key={o.id}>
                     <Link href={`/sorties/${o.id}`} className="flex items-center gap-3 px-4 py-3 transition hover:bg-paper">
-                      <div className="flex w-9 shrink-0 flex-col items-center rounded-lg bg-sky-soft py-1 text-navy-2">
+                      <div
+                        className={`flex w-9 shrink-0 flex-col items-center rounded-lg py-1 ${
+                          o.departure_at ? "bg-sky-soft text-navy-2" : "bg-wait-soft text-wait"
+                        }`}
+                      >
                         <span className="text-[9px] font-semibold uppercase">{badge.weekday}</span>
                         <span className="text-base font-bold leading-none">{badge.day}</span>
                         <span className="text-[9px] uppercase">{badge.month}</span>
@@ -257,7 +261,10 @@ export default async function Page({
                         <p className="truncate text-sm font-semibold text-ink">
                           {KIND_ICON[o.kind ?? "vol"]} {o.title}
                         </p>
-                        <p className="text-xs text-muted">{formatTime(o.departure_at)}{o.destination ? ` · ${o.destination}` : ""}</p>
+                        <p className="text-xs text-muted">
+                          {o.departure_at ? formatTime(o.departure_at) : "📌 Projet, date à définir"}
+                          {o.destination ? ` · ${o.destination}` : ""}
+                        </p>
                       </div>
                       {myStatus === "confirmed" && <span className="ml-auto text-xs text-ok">✓</span>}
                     </Link>

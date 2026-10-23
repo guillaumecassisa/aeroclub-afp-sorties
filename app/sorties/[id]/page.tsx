@@ -48,7 +48,8 @@ export default async function Page({
   const isFlight = kind === "vol";
   const now = new Date();
   const cancelled = o.status === "cancelled";
-  const started = new Date(o.departure_at) <= now;
+  const project = !o.departure_at; // projet : date à définir
+  const started = !!o.departure_at && new Date(o.departure_at) <= now;
   const deadlinePassed = !!o.registration_deadline && new Date(o.registration_deadline) < now;
   const approved = !o.approval || o.approval === "approved";
   const organizer = canOrganize(me) || !!o.is_organizer; // peut gérer les inscrits et les équipages
@@ -87,6 +88,7 @@ export default async function Page({
           <div className="mt-1 flex flex-wrap gap-1">
             <span className="pill bg-sky-soft text-navy-2">{KIND_LABELS[kind]}</span>
             {cancelled && <span className="pill bg-danger-soft text-danger">Annulé</span>}
+            {project && !cancelled && <span className="pill bg-wait-soft text-wait">📌 Projet · date à définir</span>}
             {o.approval === "pending" && !cancelled && <span className="pill bg-wait-soft text-wait">En attente de validation</span>}
             {o.approval === "rejected" && !cancelled && <span className="pill bg-danger-soft text-danger">Proposition refusée</span>}
             {!cancelled && <StatusPill status={mine?.status ?? null} />}
@@ -154,7 +156,13 @@ export default async function Page({
         <div className="space-y-4 lg:col-span-2">
           {/* Infos */}
           <div className="card space-y-2 p-5 text-sm">
-            <Info label="Départ" value={formatDateTime(o.departure_at)} />
+            <Info label={isFlight ? "Départ" : "Date"} value={formatDateTime(o.departure_at)} />
+            {project && (
+              <p className="rounded-lg bg-wait-soft px-3 py-2 text-ink">
+                📌 C&apos;est un projet : la date sera fixée plus tard. Inscrivez-vous dès maintenant pour montrer votre intérêt,
+                vous serez prévenu(e) quand la date sera décidée.
+              </p>
+            )}
             {o.return_at && <Info label="Retour" value={formatDateTime(o.return_at)} />}
             {o.destination && <Info label={isFlight ? "Destination" : "Lieu"} value={o.destination} />}
             {o.meeting_point && <Info label="Rendez-vous" value={o.meeting_point} />}
@@ -205,9 +213,15 @@ export default async function Page({
               ) : canRegister ? (
                 <form action={registerSelf.bind(null, id)} className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-sm text-muted">
-                    {free === 0 ? "C'est complet : vous serez placé en liste d'attente." : "Places attribuées dans l'ordre d'inscription."}
+                    {free === 0
+                      ? "C'est complet : vous serez placé en liste d'attente."
+                      : project
+                        ? "Montrez votre intérêt : places attribuées dans l'ordre d'inscription."
+                        : "Places attribuées dans l'ordre d'inscription."}
                   </p>
-                  <SubmitButton pending="Inscription…">{free === 0 ? "Rejoindre la liste d'attente" : "S'inscrire"}</SubmitButton>
+                  <SubmitButton pending="Inscription…">
+                    {free === 0 ? "Rejoindre la liste d'attente" : project ? "Je suis intéressé(e)" : "S'inscrire"}
+                  </SubmitButton>
                 </form>
               ) : (
                 <p className="text-sm text-muted">{started ? "L'événement a eu lieu." : "Les inscriptions sont closes."}</p>

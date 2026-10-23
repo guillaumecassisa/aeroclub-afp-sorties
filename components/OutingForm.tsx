@@ -44,6 +44,7 @@ export function OutingForm({
   const [selected, setSelected] = useState<string[]>(initial.aircraft);
   const [flies, setFlies] = useState(!!initial.instructor_aircraft);
   const [myAircraft, setMyAircraft] = useState<string>(initial.instructor_aircraft ?? "");
+  const [noDate, setNoDate] = useState(!initial.departure_at);
 
   const isFlight = kind === "vol";
   const byId = useMemo(() => new Map(fleet.map((a) => [a.id, a])), [fleet]);
@@ -114,14 +115,14 @@ export function OutingForm({
         </div>
         <div className="grid gap-4 sm:grid-cols-3">
           <div>
-            <label className="label" htmlFor="departure_at">{isFlight ? "Départ *" : "Début *"}</label>
+            <label className="label" htmlFor="departure_at">{isFlight ? "Départ" : "Début"}</label>
             <input
               className="field"
               id="departure_at"
               name="departure_at"
               type="datetime-local"
               defaultValue={initial.departure_at}
-              required
+              onChange={(e) => setNoDate(!e.target.value)}
             />
           </div>
           <div>
@@ -133,6 +134,13 @@ export function OutingForm({
             <input className="field" id="registration_deadline" name="registration_deadline" type="datetime-local" defaultValue={initial.registration_deadline} />
           </div>
         </div>
+        {noDate && (
+          <p className="rounded-lg bg-wait-soft px-3 py-2 text-sm text-ink">
+            📌 <strong>Pas encore de date ?</strong> Laissez « {isFlight ? "Départ" : "Début"} » vide : l&apos;événement sera
+            publié comme <strong>projet, date à définir</strong>. Les membres pourront s&apos;inscrire pour montrer leur
+            intérêt, et vous fixerez la date plus tard avec « Modifier » (les membres en seront prévenus).
+          </p>
+        )}
         <div>
           <label className="label" htmlFor="description">{isFlight ? "Programme / informations" : "Description"}</label>
           <textarea

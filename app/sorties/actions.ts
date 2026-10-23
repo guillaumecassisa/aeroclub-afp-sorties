@@ -30,7 +30,7 @@ function back(id: string, key: "ok" | "erreur", msg: string): never {
   redirect(`/sorties/${id}?${key}=${encodeURIComponent(msg)}`);
 }
 
-type OutingInfo = { id: string; title: string; departure_at: string };
+type OutingInfo = { id: string; title: string; departure_at: string | null };
 
 async function outingInfo(id: string): Promise<OutingInfo | null> {
   const supabase = await createClient();
@@ -39,7 +39,7 @@ async function outingInfo(id: string): Promise<OutingInfo | null> {
 }
 
 /** Prévient tous les membres (qui l'acceptent) qu'un événement vient d'être publié. */
-async function announcePublished(outingId: string): Promise<string> {
+async function announcePublished(outingId: string, dateFixed = false): Promise<string> {
   const supabase = await createClient();
   const [{ data: rec }, { data: o }] = await Promise.all([
     supabase.rpc("event_mail_recipients", { p_outing: outingId }),
@@ -60,7 +60,8 @@ async function announcePublished(outingId: string): Promise<string> {
       id: outingId,
       title: o.title as string,
       kind,
-      dates: [o.departure_at as string],
+      dates: o.departure_at ? [o.departure_at as string] : [],
+      dateFixed,
       destination: o.destination as string | null,
       meeting_point: o.meeting_point as string | null,
       description: o.description as string | null,
@@ -92,10 +93,14 @@ export async function saveOuting(_prev: FormState, formData: FormData): Promise<
   const max = kind !== "vol" && maxRaw ? Number(maxRaw) : null;
 
   if (!title) return { error: "Le titre est obligatoire." };
-  if (!departure_at) return { error: "La date de départ est obligatoire." };
-  if (return_at && return_at < departure_at) return { error: "Le retour doit être après le départ." };
+  // Sans date de départ : projet « date à définir », la date sera fixée plus tard
+  if (!departure_at && return_at) return { error: "Indiquez la date de départ avant la date de retour, ou laissez les deux vides." };
+  if (departure_at && return_at && return_at < departure_at) return { error: "Le retour doit être après le départ." };
   if (kind === "vol" && aircraft.length === 0) return { error: "Sélectionnez au moins un avion." };
   if (max !== null && (!Number.isInteger(max) || max < 1)) return { error: "Le nombre de places doit être un entier positif." };
+
+  // Un projet sans date qui reçoit sa date : les membres en seront prévenus
+  const before = id ? await outingInfo(id) : null;
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("save_outing", {
@@ -138,9 +143,16 @@ export async function saveOuting(_prev: FormState, formData: FormData): Promise<
       ? "Proposition modifiée : elle repart en validation auprès des instructeurs."
       : "Proposition envoyée : un instructeur ou un administrateur va la valider avant publication.";
   } else if (id) {
-    msg = "Événement mis à jour.";
+    msg =
+      before && !before.departure_at && departure_at
+        ? "Date fixée : l'événement n'est plus un projet." + (await announcePublished(res.outing_id, true))
+        : "Événement mis à jour.";
   } else {
-    msg = "Événement créé : les membres peuvent s'inscrire." + (await announcePublished(res.outing_id));
+    msg =
+      (departure_at
+        ? "Événement créé : les membres peuvent s'inscrire."
+        : "Projet créé (date à définir) : les membres peuvent déjà montrer leur intérêt.") +
+      (await announcePublished(res.outing_id));
   }
   const promoted = (res.changes ?? []).filter((c) => c.change === "promoted").length;
   const demoted = (res.changes ?? []).filter((c) => c.change === "demoted").length;
@@ -240,7 +252,7 @@ export async function reviewOuting(outingId: string, approve: boolean, formData:
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("review_outing", { p_id: outingId, p_approve: approve, p_reason: reason });
   if (error) back(outingId, "erreur", error.message);
-  const r = data as { email: string; full_name: string; title: string; departure_at: string } | null;
+  const r = data as { email: string; full_name: string; title: string; departure_at: string | null } | null;
   if (r) await notifyReview(r, { id: outingId, title: r.title, departure_at: r.departure_at }, approve, reason);
   const informed = approve ? await announcePublished(outingId) : "";
   back(

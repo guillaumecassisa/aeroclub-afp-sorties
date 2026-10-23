@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { requireMember, canOrganize, isStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Banner, StatusPill } from "@/components/Banner";
-import { formatDate, formatTime, dayBadge } from "@/lib/dates";
+import { formatWhen, dayBadge } from "@/lib/dates";
 import type { OutingSummary } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Événements" };
@@ -27,7 +27,9 @@ export default async function Page({
   ]);
   const all = (up ?? []) as OutingSummary[];
   const toReview = all.filter((o) => o.approval && o.approval !== "approved" && o.status === "open");
-  const upcoming = all.filter((o) => (!o.approval || o.approval === "approved") && o.status === "open");
+  const published = all.filter((o) => (!o.approval || o.approval === "approved") && o.status === "open");
+  const upcoming = published.filter((o) => o.departure_at);
+  const projects = published.filter((o) => !o.departure_at);
   const cancelled = all.filter((o) => o.status === "cancelled");
   const past = [...cancelled, ...((pastRaw ?? []) as OutingSummary[])].slice(0, 30);
 
@@ -59,7 +61,7 @@ export default async function Page({
         </section>
       )}
 
-      {upcoming.length === 0 && past.length === 0 && toReview.length === 0 && (
+      {upcoming.length === 0 && projects.length === 0 && past.length === 0 && toReview.length === 0 && (
         <div className="card p-8 text-center text-muted">Aucun événement pour le moment.</div>
       )}
 
@@ -68,6 +70,18 @@ export default async function Page({
           <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">À venir</h2>
           <div className="space-y-3">
             {upcoming.map((o) => (
+              <OutingCard key={o.id} outing={o} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {projects.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-1 text-sm font-semibold tracking-wide text-muted uppercase">📌 Projets · date à définir</h2>
+          <p className="mb-3 text-xs text-muted">Inscrivez-vous pour montrer votre intérêt : vous serez prévenu(e) quand la date sera fixée.</p>
+          <div className="space-y-3">
+            {projects.map((o) => (
               <OutingCard key={o.id} outing={o} />
             ))}
           </div>
@@ -104,7 +118,11 @@ function OutingCard({ outing: o, muted }: { outing: OutingSummary; muted?: boole
       href={`/sorties/${o.id}`}
       className={`card flex gap-4 p-4 transition hover:shadow-md ${muted ? "opacity-60" : ""}`}
     >
-      <div className="flex w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-sky-soft py-2 text-navy-2">
+      <div
+        className={`flex w-12 shrink-0 flex-col items-center justify-center rounded-xl py-2 ${
+          o.departure_at ? "bg-sky-soft text-navy-2" : "bg-wait-soft text-wait"
+        }`}
+      >
         <span className="text-[10px] font-semibold uppercase tracking-wide">{badge.weekday}</span>
         <span className="text-2xl font-bold leading-none">{badge.day}</span>
         <span className="text-[11px] font-medium uppercase">{badge.month}</span>
@@ -124,7 +142,7 @@ function OutingCard({ outing: o, muted }: { outing: OutingSummary; muted?: boole
         </div>
         {o.destination && <p className="text-sm text-muted">{o.destination}</p>}
         <p className="mt-1 text-xs text-muted">
-          {formatDate(o.departure_at)} · {formatTime(o.departure_at)} · par {o.instructor_name}
+          {formatWhen(o.departure_at)} · par {o.instructor_name}
           {!cancelled && !muted && <> · {places(o)}</>}
         </p>
         {o.aircraft_summary && <p className="mt-0.5 text-xs text-muted">{o.aircraft_summary}</p>}

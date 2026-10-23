@@ -52,7 +52,7 @@ export type OutingSummary = {
   id: string;
   title: string;
   destination: string | null;
-  departure_at: string;
+  departure_at: string | null; // null : projet, date à définir
   return_at: string | null;
   registration_deadline: string | null;
   status: "open" | "cancelled";
@@ -101,7 +101,7 @@ export type OutingDetail = {
   destination: string | null;
   description: string | null;
   meeting_point: string | null;
-  departure_at: string;
+  departure_at: string | null; // null : projet, date à définir
   return_at: string | null;
   registration_deadline: string | null;
   status: "open" | "cancelled";

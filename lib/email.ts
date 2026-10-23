@@ -67,7 +67,12 @@ async function sendAll(mails: Mail[]) {
   await Promise.allSettled(mails.map(send));
 }
 
-type OutingInfo = { id: string; title: string; departure_at: string };
+type OutingInfo = { id: string; title: string; departure_at: string | null };
+
+/** « du samedi 4 octobre 2026 à 09:00 », ou « (date à définir) » pour un projet */
+function du(o: OutingInfo) {
+  return o.departure_at ? `du ${formatDateTime(o.departure_at)}` : "(date à définir)";
+}
 
 function link(o: OutingInfo) {
   return SITE_URL ? `${SITE_URL}/sorties/${o.id}` : "";
@@ -75,7 +80,6 @@ function link(o: OutingInfo) {
 
 export async function notifySeatChanges(changes: SeatChange[] | null | undefined, outing: OutingInfo) {
   if (!changes?.length) return;
-  const when = formatDateTime(outing.departure_at);
   await sendAll(
     changes
       .filter((c) => c.email)
@@ -87,7 +91,7 @@ export async function notifySeatChanges(changes: SeatChange[] | null | undefined
               text:
                 `Bonjour ${c.full_name || ""},\n\n` +
                 `Bonne nouvelle : une place s'est libérée. Vous passez de la liste d'attente à la liste des participants ` +
-                `pour la sortie « ${outing.title} » du ${when}.\n\n` +
+                `pour la sortie « ${outing.title} » ${du(outing)}.\n\n` +
                 `Si vous ne pouvez plus y participer, merci de vous désinscrire rapidement pour laisser la place au suivant.\n\n` +
                 `${link(outing)}\n\n— ${CLUB_NAME}`,
             }
@@ -96,7 +100,7 @@ export async function notifySeatChanges(changes: SeatChange[] | null | undefined
               subject: `Sortie modifiée : ${outing.title}`,
               text:
                 `Bonjour ${c.full_name || ""},\n\n` +
-                `Suite à une modification des avions de la sortie « ${outing.title} » du ${when}, ` +
+                `Suite à une modification des avions de la sortie « ${outing.title} » ${du(outing)}, ` +
                 `le nombre de places a diminué et vous repassez en tête de liste d'attente. ` +
                 `Vous serez prévenu(e) automatiquement si une place se libère.\n\n` +
                 `${link(outing)}\n\n— ${CLUB_NAME}`,
@@ -120,7 +124,7 @@ export async function notifyNewProposal(
         subject: `Événement proposé à valider : ${outing.title}`,
         text:
           `Bonjour ${s.full_name || ""},\n\n` +
-          `${proposer} propose la sortie « ${outing.title} » le ${when}.\n` +
+          `${proposer} propose la sortie « ${outing.title} » ${outing.departure_at ? `le ${when}` : "(date à définir)"}.\n` +
           `Elle ne sera visible des membres qu'après validation par un instructeur ou un administrateur.\n\n` +
           `${link(outing)}\n\n— ${CLUB_NAME}`,
       })),
@@ -134,7 +138,6 @@ export async function notifyReview(
   reason?: string | null,
 ) {
   if (!proposer?.email) return;
-  const when = formatDateTime(outing.departure_at);
   await sendAll([
     approved
       ? {
@@ -142,7 +145,7 @@ export async function notifyReview(
           subject: `✈️ Sortie validée : ${outing.title}`,
           text:
             `Bonjour ${proposer.full_name || ""},\n\n` +
-            `Votre proposition « ${outing.title} » du ${when} a été validée : elle est maintenant publiée et les membres peuvent s'inscrire.\n\n` +
+            `Votre proposition « ${outing.title} » ${du(outing)} a été validée : elle est maintenant publiée et les membres peuvent s'inscrire.\n\n` +
             `${link(outing)}\n\n— ${CLUB_NAME}`,
         }
       : {
@@ -150,7 +153,7 @@ export async function notifyReview(
           subject: `Sortie non retenue : ${outing.title}`,
           text:
             `Bonjour ${proposer.full_name || ""},\n\n` +
-            `Votre proposition « ${outing.title} » du ${when} n'a pas été validée.` +
+            `Votre proposition « ${outing.title} » ${du(outing)} n'a pas été validée.` +
             (reason ? `\nMotif : ${reason}` : "") +
             `\n\nVous pouvez la modifier depuis le site : elle repartira alors en validation.\n\n${link(outing)}\n\n— ${CLUB_NAME}`,
         },
@@ -171,7 +174,7 @@ export async function notifyOutingCancelled(
         subject: `Sortie annulée : ${outing.title}`,
         text:
           `Bonjour ${r.full_name || ""},\n\n` +
-          `La sortie « ${outing.title} » prévue le ${when} est annulée.\n\n` +
+          `La sortie « ${outing.title} » ${outing.departure_at ? `prévue le ${when}` : "(date à définir)"} est annulée.\n\n` +
           `${link(outing)}\n\n— ${CLUB_NAME}`,
       })),
   );
@@ -194,6 +197,7 @@ export type PublishedEvent = {
   description?: string | null;
   places?: string | null;
   organizer?: string | null;
+  dateFixed?: boolean; // projet sans date dont la date vient d'être fixée
 };
 
 /** Prévient tous les membres (copie cachée, par lots) qu'un événement vient d'être publié. */
@@ -202,16 +206,22 @@ export async function notifyEventPublished(
   ev: PublishedEvent,
 ) {
   const emails = [...new Set((recipients ?? []).map((r) => r.email).filter(Boolean))];
-  if (!emails.length || !ev.dates.length) return;
-  const k = KIND_MAIL[ev.kind] ?? KIND_MAIL.evenement;
-  const when =
-    ev.dates.length === 1
+  if (!emails.length) return;
+  const base = KIND_MAIL[ev.kind] ?? KIND_MAIL.evenement;
+  const k = ev.dateFixed
+    ? { icon: "📅", label: "Date fixée" }
+    : !ev.dates.length
+      ? { icon: "📌", label: `${base.label} en projet` }
+      : base;
+  const when = !ev.dates.length
+    ? `Date à définir : inscrivez-vous dès maintenant pour montrer votre intérêt, vous serez prévenu(e) quand la date sera fixée.`
+    : ev.dates.length === 1
       ? `Le ${formatDateTime(ev.dates[0])}`
       : `${ev.dates.length} dates :\n${ev.dates.map((d) => `  • ${formatDateTime(d)}`).join("\n")}`;
   const lines = [
     `Bonjour,`,
     ``,
-    `${k.label} au club : « ${ev.title} »`,
+    ev.dateFixed ? `La date de « ${ev.title} » est fixée !` : `${k.label} au club : « ${ev.title} »`,
     ``,
     when,
     ev.destination ? `${ev.kind === "vol" ? "Destination" : "Lieu"} : ${ev.destination}` : null,

@@ -4,7 +4,7 @@ import { canOrganize, canTeach, requireMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Banner, StatusPill } from "@/components/Banner";
 import { SubmitButton } from "@/components/ui";
-import { dayBadge, formatDate, formatTime } from "@/lib/dates";
+import { dayBadge, formatDate, formatWhen } from "@/lib/dates";
 import { PEDA_BUCKET, PEDA_CATEGORIES, REX_PHASES, REX_STATUS, phaseLabel } from "@/lib/pedagogie";
 import type { OutingSummary } from "@/lib/types";
 import { QUIZ_CATEGORIES } from "@/lib/quiz";
@@ -458,7 +458,7 @@ async function Formations({ organizer }: { organizer: boolean }) {
                 <StatusPill status={o.my_status} />
               </div>
               <p className="text-xs text-muted">
-                {formatDate(o.departure_at)} · {formatTime(o.departure_at)}
+                {formatWhen(o.departure_at)}
                 {o.destination && <> · {o.destination}</>} · par {o.instructor_name}
                 {left != null && <> · {left === 0 ? "complet" : `${left} place${left > 1 ? "s" : ""} libre${left > 1 ? "s" : ""}`}</>}
               </p>
