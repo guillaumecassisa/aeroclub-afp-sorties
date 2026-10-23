@@ -79,4 +79,11 @@ su postgres -c "cd $DIR && $PSQL" < "$DIR/tests/test_parcours_roles.sql"
 su postgres -c "$PSQL" < "$DIR/supabase/migration-33-fiabilite.sql"
 su postgres -c "$PSQL" < "$DIR/supabase/migration-33-fiabilite.sql"
 su postgres -c "cd $DIR && $PSQL" < "$DIR/tests/test_migration33.sql"
+su postgres -c "$PSQL" < "$DIR/tests/prep_migration34.sql"
+su postgres -c "$PSQL" < "$DIR/supabase/migration-34-quiz.sql"
+su postgres -c "$PSQL -c \"select count(*) from public.quiz_questions\"" > /tmp/q34a.txt
+su postgres -c "$PSQL" < "$DIR/supabase/migration-34-quiz.sql"
+su postgres -c "$PSQL -c \"select count(*) from public.quiz_questions\"" > /tmp/q34b.txt
+cmp /tmp/q34a.txt /tmp/q34b.txt
+su postgres -c "cd $DIR && $PSQL" < "$DIR/tests/test_migration34.sql"
 echo "TOUS LES TESTS SONT PASSÉS"

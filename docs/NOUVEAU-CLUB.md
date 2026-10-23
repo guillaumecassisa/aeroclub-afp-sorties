@@ -45,7 +45,7 @@ ou depuis le site lui-même.
 | Carte du bar | site → ⚙️ Gestion → Trésorerie du bar |
 | Articles du shop | site → ⚙️ Gestion → Shop (gestion) |
 | Liens utiles (Préparer son vol) | site → ⚙️ Gestion → Liens utiles |
-| Questions du quiz (le quiz démarre vide) | site → ⚙️ Gestion → Questions du quiz (chef pilote, resp. conformité ou admin) |
+| Questions du quiz : environ 875 questions générales sont fournies (3 par jour) ; celles sur LFMA sont retirées par `nouveau-club-vider-exemples.sql`, écrivez celles de votre terrain | site → ⚙️ Gestion → Questions du quiz (chef pilote, resp. conformité ou admin). Les sources sont dans `supabase/quiz-source/` (`python3 supabase/quiz-source/build.py supabase/migration-34-quiz.sql` régénère la mise à jour) |
 | Types d'avions proposés pour les lâchers | automatique : ce sont les types des avions de votre flotte |
 
 ## 5. Premier administrateur

@@ -33,6 +33,7 @@ select
     and exists (select 1 from pg_proc where proname = 'admin_export')
     and to_regclass('public._seeds') is not null
     and exists (select 1 from pg_policies where policyname = 'quiz_questions_teach_update')
+    and exists (select 1 from pg_proc where proname = 'quiz_today_set')
   as "TOUT EST A JOUR",
   (select count(*) from public.profiles) as membres,
   (select string_agg(registration, ', ' order by registration) from public.aircraft) as avions,

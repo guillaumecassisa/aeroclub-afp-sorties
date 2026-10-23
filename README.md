@@ -10,7 +10,7 @@ Technologies : Next.js 16 (Vercel) + Supabase (PostgreSQL, comptes, fichiers). O
 
 | Rubrique | Ce qu'on y fait |
 |---|---|
-| Accueil | Annonces, prochains événements, météo/QNH, statistiques, question du jour |
+| Accueil | Annonces, prochains événements, météo/QNH, statistiques, 3 questions du jour (QCM) |
 | Événements | Sorties avion, activités, événements conviviaux, formations. Inscription, liste d'attente automatique, accompagnants (+1, jusqu'à 5 pour un événement), placement dans les avions qui respecte les lâchers, glisser-déposer pour l'organisateur, emails |
 | Espace pédagogique | Annonces et documents du chef pilote / responsable conformité, retours d'expérience (REX, anonymisables), séances de formation |
 | Préparer son vol | Météo, TAF, NOTAM, liens utiles, calcul de performances, masse et centrage |

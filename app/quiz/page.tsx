@@ -2,9 +2,11 @@ import { requireMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
 import { QUIZ_CATEGORIES } from "@/lib/quiz";
+import { QuizPopup, type DailySet } from "@/components/QuizPopup";
+import { submitQuizAnswer } from "@/app/quiz/actions";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Question du jour — Classement" };
+export const metadata = { title: "Questions du jour — Classement" };
 
 type LeaderRow = {
   user_id: string;
@@ -22,10 +24,14 @@ export default async function QuizPage() {
   const supabase = await createClient();
 
   // Classement et historique calculés par la base (les noms des autres membres n'y sont pas lisibles directement)
-  const [{ data: leaderRaw }, { data: historyRaw }] = await Promise.all([
+  const [{ data: leaderRaw }, { data: historyRaw }, { data: statsRaw }, { data: setRaw }] = await Promise.all([
     supabase.rpc("quiz_leaderboard"),
     supabase.rpc("quiz_my_history"),
+    supabase.rpc("quiz_my_stats"),
+    supabase.rpc("quiz_today_set"),
   ]);
+  const dailySet = setRaw as DailySet | null;
+  const stats = statsRaw as { total: number; correct: number } | null;
   const leaderboard = (leaderRaw ?? []) as LeaderRow[];
   const myAnswers = (historyRaw ?? []) as {
     question_id: number;
@@ -35,16 +41,18 @@ export default async function QuizPage() {
     category: string | null;
   }[];
 
-  const myTotal = myAnswers?.length ?? 0;
-  const myCorrect = myAnswers?.filter((a) => a.is_correct).length ?? 0;
+  // Totaux sur toutes mes réponses (l'historique affiché se limite aux plus récentes)
+  const myTotal = stats?.total ?? myAnswers.length;
+  const myCorrect = stats?.correct ?? myAnswers.filter((a) => a.is_correct).length;
   const myRank = leaderboard.findIndex((r) => r.user_id === profile.id) + 1;
 
   return (
     <div className="space-y-8">
+      {dailySet?.questions?.length ? <QuizPopup set={dailySet} submitAnswer={submitQuizAnswer} /> : null}
       <div>
-        <h1 className="text-2xl font-bold text-navy-2">✈️ Question du jour</h1>
+        <h1 className="text-2xl font-bold text-navy-2">✈️ Questions du jour</h1>
         <p className="mt-1 text-sm text-muted">
-          Chaque jour, une nouvelle question de culture aéronautique. Le classement est mis à jour en temps réel.
+          Chaque jour, 3 nouvelles questions (QCM) pour réviser le pilotage, la météo, la réglementation et la navigation. Le classement est mis à jour en temps réel.
         </p>
       </div>
 
@@ -136,6 +144,12 @@ export default async function QuizPage() {
           </div>
         </div>
       )}
+
+      <p className="text-xs text-muted">
+        De nombreuses questions s&apos;appuient sur le Guide de l&apos;instructeur VFR de l&apos;ENAC (éd. 3, amdt 2,
+        licence CC BY-NC-ND) et, pour le terrain, sur la carte VAC de l&apos;AIP France. En cas de doute, la
+        documentation officielle en vigueur fait foi.
+      </p>
     </div>
   );
 }

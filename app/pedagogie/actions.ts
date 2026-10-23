@@ -9,9 +9,15 @@ import { PEDA_BUCKET, PEDA_CATEGORIES, REX_PHASES, REX_STATUS } from "@/lib/peda
 import { notifyRexSubmitted } from "@/lib/email";
 import { QUIZ_CATEGORIES } from "@/lib/quiz";
 
-function back(tab: string, key: "ok" | "erreur", msg: string): never {
+function back(tab: string, key: "ok" | "erreur", msg: string, extra = ""): never {
   revalidatePath("/pedagogie");
-  redirect(`/pedagogie?onglet=${tab}&${key}=${encodeURIComponent(msg)}`);
+  redirect(`/pedagogie?onglet=${tab}${extra}&${key}=${encodeURIComponent(msg)}`);
+}
+
+/** Retour sur la même page de la liste des questions (catégorie, recherche, page). */
+function quizRet(fd?: FormData): string {
+  const ret = String(fd?.get("ret") ?? "");
+  return /^(&(cat|page|q)=[\w%.\-+]{0,120}){0,3}$/.test(ret) ? ret : "";
 }
 
 const text = (fd: FormData, k: string, max: number) => String(fd.get(k) ?? "").trim().slice(0, max);
@@ -148,34 +154,34 @@ export async function saveQuizQuestion(id: number | null, formData: FormData) {
     active: formData.get("active") === "on",
   };
   if (!v.question || !v.option_a || !v.option_b || !v.option_c || !v.option_d)
-    back("quiz", "erreur", "La question et les quatre réponses sont obligatoires.");
-  if (!["a", "b", "c", "d"].includes(v.correct)) back("quiz", "erreur", "Indiquez la bonne réponse.");
+    back("quiz", "erreur", "La question et les quatre réponses sont obligatoires.", quizRet(formData));
+  if (!["a", "b", "c", "d"].includes(v.correct)) back("quiz", "erreur", "Indiquez la bonne réponse.", quizRet(formData));
   if (!QUIZ_CATEGORIES[v.category]) v.category = "general";
   const supabase = await createClient();
   const { data, error } = id
     ? await supabase.from("quiz_questions").update(v).eq("id", id).select("id")
     : await supabase.from("quiz_questions").insert(v).select("id");
-  if (error) back("quiz", "erreur", error.message);
-  if (!data?.length) back("quiz", "erreur", "La base n'est pas à jour : exécutez la mise à jour n°33 dans Supabase.");
-  back("quiz", "ok", id ? "Question enregistrée." : "Question ajoutée au quiz.");
+  if (error) back("quiz", "erreur", error.message, quizRet(formData));
+  if (!data?.length) back("quiz", "erreur", "La base n'est pas à jour : exécutez la mise à jour n°33 dans Supabase.", quizRet(formData));
+  back("quiz", "ok", id ? "Question enregistrée." : "Question ajoutée au quiz.", quizRet(formData));
 }
 
-export async function toggleQuizQuestion(id: number, active: boolean) {
+export async function toggleQuizQuestion(id: number, active: boolean, formData?: FormData) {
   await requireTeacher();
   const supabase = await createClient();
   const { error } = await supabase.from("quiz_questions").update({ active }).eq("id", id);
-  if (error) back("quiz", "erreur", error.message);
-  back("quiz", "ok", active ? "Question remise dans le quiz." : "Question retirée du quiz.");
+  if (error) back("quiz", "erreur", error.message, quizRet(formData));
+  back("quiz", "ok", active ? "Question remise dans le quiz." : "Question retirée du quiz.", quizRet(formData));
 }
 
 /** Suppression définitive, seulement pour une question à laquelle personne n'a encore répondu. */
-export async function deleteQuizQuestion(id: number) {
+export async function deleteQuizQuestion(id: number, formData?: FormData) {
   await requireTeacher();
   const supabase = await createClient();
   const { data, error } = await supabase.from("quiz_questions").delete().eq("id", id).select("id");
   if (error?.code === "23503")
-    back("quiz", "erreur", "Des membres ont déjà répondu à cette question : utilisez « Retirer du quiz » pour garder leur historique.");
-  if (error) back("quiz", "erreur", error.message);
-  if (!data?.length) back("quiz", "erreur", "Suppression impossible : la base n'est pas à jour (mise à jour n°33).");
-  back("quiz", "ok", "Question supprimée.");
+    back("quiz", "erreur", "Des membres ont déjà répondu à cette question : utilisez « Retirer du quiz » pour garder leur historique.", quizRet(formData));
+  if (error) back("quiz", "erreur", error.message, quizRet(formData));
+  if (!data?.length) back("quiz", "erreur", "Suppression impossible : la base n'est pas à jour (mise à jour n°33).", quizRet(formData));
+  back("quiz", "ok", "Question supprimée.", quizRet(formData));
 }

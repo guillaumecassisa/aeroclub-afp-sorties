@@ -12,7 +12,7 @@ import { formatDate, formatTime, dayBadge } from "@/lib/dates";
 import { euros, currentMonthKey } from "@/lib/money";
 import { createAnnouncement, deleteAnnouncement } from "@/app/annonces/actions";
 import { SubmitButton } from "@/components/ui";
-import { QuizPopup, type DailyQuestion } from "@/components/QuizPopup";
+import { QuizPopup, type DailySet } from "@/components/QuizPopup";
 import { submitQuizAnswer } from "@/app/quiz/actions";
 
 export const metadata: Metadata = { title: `Accueil — ${CLUB_NAME}` };
@@ -86,23 +86,18 @@ export default async function Page({
     year: "numeric",
   });
 
-  // Question du jour : choisie par la base (jour de Paris), sans la bonne réponse
-  const { data: quizRaw } = approved ? await supabase.rpc("quiz_today") : { data: null };
-  const dailyQuestion = quizRaw as DailyQuestion | null;
-  const alreadyAnswered = !!dailyQuestion?.already_answered;
+  // Questions du jour : choisies par la base (jour de Paris), sans les bonnes réponses
+  const { data: quizRaw } = approved ? await supabase.rpc("quiz_today_set") : { data: null };
+  const dailySet = quizRaw as DailySet | null;
 
   return (
     <>
       <Banner ok={sp.ok} erreur={sp.erreur} />
 
       {/* Quiz du jour */}
-      {dailyQuestion && profile && (
-        <QuizPopup
-          question={dailyQuestion}
-          alreadyAnswered={alreadyAnswered}
-          submitAnswer={submitQuizAnswer}
-        />
-      )}
+      {dailySet?.questions?.length && profile ? (
+        <QuizPopup set={dailySet} submitAnswer={submitQuizAnswer} />
+      ) : null}
 
       {/* Hero */}
       <div className="mb-6 overflow-hidden rounded-2xl bg-navy-2 px-6 py-6 text-white">

@@ -1,7 +1,7 @@
 -- =====================================================================
 --  NOUVEAU CLUB : retire les données d'exemple reprises de l'AFPA
 --  (avions et masse & centrage, carte du bar, liens utiles, bons plans,
---  articles du shop). À exécuter UNE FOIS, juste après
+--  articles du shop, questions du quiz sur LFMA). À exécuter UNE FOIS, juste après
 --  installation-complete.sql, sur une base neuve.
 --  Ensuite : ajoutez vos avions dans « Flotte (maintenance) », votre carte
 --  dans « Bar → Trésorerie », vos liens dans « Liens utiles »…
@@ -20,6 +20,9 @@ delete from public.bar_products;
 delete from public.club_links;
 delete from public.airfield_tips;
 delete from public.shop_items;
+-- Questions du quiz propres à l'aérodrome d'Aix-les-Milles (LFMA) : à réécrire pour votre terrain
+delete from public.quiz_questions q
+ where q.category = 'lfma' and not exists (select 1 from public.quiz_answers a where a.question_id = q.id);
 update public.club_info set association_name = 'Mon aéroclub', address = null, registration_number = null,
   publication_director = null, contact_email = null, contact_phone = null, updated_at = now()
  where id = 1;

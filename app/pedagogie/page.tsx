@@ -107,7 +107,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
       {tab === "documents" && <Documents teacher={teacher} />}
       {tab === "rex" && <RexTab teacher={teacher} myId={me.id} />}
       {tab === "formations" && <Formations organizer={canOrganize(me)} />}
-      {tab === "quiz" && teacher && <QuizAdmin cat={sp.cat} />}
+      {tab === "quiz" && teacher && <QuizAdmin cat={sp.cat} page={sp.page} search={sp.q} />}
     </>
   );
 }
@@ -485,43 +485,88 @@ type QuizQ = {
   active: boolean;
 };
 
-async function QuizAdmin({ cat }: { cat?: string }) {
+const QUIZ_PAGE_SIZE = 50;
+
+async function QuizAdmin({ cat, page, search }: { cat?: string; page?: string; search?: string }) {
   const supabase = await createClient();
-  const { data, error } = await supabase.from("quiz_questions").select("*").order("category").order("id");
-  const all = (data ?? []) as QuizQ[];
-  const shown = cat ? all.filter((q) => q.category === cat) : all;
+  const catKey = cat && QUIZ_CATEGORIES[cat] ? cat : undefined;
+  const term = (search ?? "").trim().slice(0, 80);
+  const pageNo = Math.max(1, Math.min(1000, parseInt(page ?? "1", 10) || 1));
+
+  // Compteurs par catégorie : lecture légère, par tranches (Supabase renvoie 1000 lignes au plus par requête)
+  const meta: { category: string; active: boolean }[] = [];
+  let metaError = null;
+  for (let from = 0; from < 20000; from += 1000) {
+    const { data, error } = await supabase.from("quiz_questions").select("category, active").order("id").range(from, from + 999);
+    if (error) { metaError = error; break; }
+    meta.push(...((data ?? []) as { category: string; active: boolean }[]));
+    if (!data || data.length < 1000) break;
+  }
   const counts = new Map<string, number>();
-  for (const q of all) counts.set(q.category, (counts.get(q.category) ?? 0) + 1);
+  for (const m of meta) counts.set(m.category, (counts.get(m.category) ?? 0) + 1);
+  const activeCount = meta.filter((m) => m.active).length;
+
+  // Page affichée : filtrée (catégorie, recherche) et paginée
+  let query = supabase.from("quiz_questions").select("*", { count: "exact" });
+  if (catKey) query = query.eq("category", catKey);
+  if (term) {
+    const t = term.replace(/[%_,()]/g, " ");
+    query = query.or(`question.ilike.%${t}%,explanation.ilike.%${t}%`);
+  }
+  const { data, error: listError, count } = await query
+    .order("category")
+    .order("id")
+    .range((pageNo - 1) * QUIZ_PAGE_SIZE, pageNo * QUIZ_PAGE_SIZE - 1);
+  const shown = (data ?? []) as QuizQ[];
+  const pages = Math.max(1, Math.ceil((count ?? 0) / QUIZ_PAGE_SIZE));
+  const error = metaError ?? listError;
+  const base = `/pedagogie?onglet=quiz${catKey ? `&cat=${catKey}` : ""}${term ? `&q=${encodeURIComponent(term)}` : ""}`;
+  const ret = `${catKey ? `&cat=${catKey}` : ""}${pageNo > 1 ? `&page=${pageNo}` : ""}${term ? `&q=${encodeURIComponent(term)}` : ""}`;
 
   return (
     <div className="space-y-5">
       <p className="text-sm text-muted">
-        Une question par jour est tirée parmi les questions actives ({all.filter((q) => q.active).length}). Vérifiez chaque
+        Chaque membre reçoit 3 questions par jour, tirées parmi les questions actives ({activeCount}). Vérifiez chaque
         réponse avec les documents de référence (VAC, AIP, manuels de vol) : le quiz sert à apprendre.
       </p>
       {error && (
         <p className="rounded-lg bg-wait-soft px-4 py-3 text-sm text-wait">
-          La base n&apos;est pas à jour : exécutez la mise à jour n°33 dans Supabase pour gérer les questions.
+          La base n&apos;est pas à jour : exécutez la dernière mise à jour dans Supabase pour gérer les questions.
         </p>
       )}
 
-      <details className="card p-5" open={all.length === 0}>
+      <details className="card p-5" open={meta.length === 0}>
         <summary className="cursor-pointer font-semibold text-navy-2">+ Écrire une nouvelle question (QCM, 4 réponses)</summary>
-        <QuizForm action={saveQuizQuestion.bind(null, null)} />
+        <QuizForm action={saveQuizQuestion.bind(null, null)} ret={ret} />
       </details>
 
+      <form action="/pedagogie" className="flex flex-wrap gap-2">
+        <input type="hidden" name="onglet" value="quiz" />
+        {catKey && <input type="hidden" name="cat" value={catKey} />}
+        <label htmlFor="quiz-search" className="sr-only">Rechercher une question</label>
+        <input id="quiz-search" name="q" defaultValue={term} placeholder="Rechercher un mot (ex. : QNH, décrochage…)" className="field min-w-0 flex-1" />
+        <button className="btn-secondary">Rechercher</button>
+        {term && (
+          <Link href={`/pedagogie?onglet=quiz${catKey ? `&cat=${catKey}` : ""}`} className="btn-secondary">Effacer</Link>
+        )}
+      </form>
+
       <nav className="flex flex-wrap gap-2 text-sm" aria-label="Catégories">
-        <Link href="/pedagogie?onglet=quiz" className={`pill ${!cat ? "bg-navy-2 text-white" : "bg-white text-navy-2"}`}>
-          Toutes ({all.length})
+        <Link href={`/pedagogie?onglet=quiz${term ? `&q=${encodeURIComponent(term)}` : ""}`} className={`pill ${!catKey ? "bg-navy-2 text-white" : "bg-white text-navy-2"}`}>
+          Toutes ({meta.length})
         </Link>
         {Object.entries(QUIZ_CATEGORIES)
           .filter(([k]) => counts.has(k))
           .map(([k, label]) => (
-            <Link key={k} href={`/pedagogie?onglet=quiz&cat=${k}`} className={`pill ${cat === k ? "bg-navy-2 text-white" : "bg-white text-navy-2"}`}>
+            <Link key={k} href={`/pedagogie?onglet=quiz&cat=${k}${term ? `&q=${encodeURIComponent(term)}` : ""}`} className={`pill ${catKey === k ? "bg-navy-2 text-white" : "bg-white text-navy-2"}`}>
               {label} ({counts.get(k)})
             </Link>
           ))}
       </nav>
+
+      <p className="text-xs text-muted">
+        {count ?? 0} question(s){term ? ` contenant « ${term} »` : ""} · page {pageNo} sur {pages}
+      </p>
 
       <ul className="space-y-2">
         {shown.map((q) => (
@@ -537,14 +582,16 @@ async function QuizAdmin({ cat }: { cat?: string }) {
                   Réponse : {q.correct.toUpperCase()}. {q[`option_${q.correct}` as "option_a"]}
                 </p>
               </summary>
-              <QuizForm q={q} action={saveQuizQuestion.bind(null, q.id)} />
+              <QuizForm q={q} action={saveQuizQuestion.bind(null, q.id)} ret={ret} />
               <div className="mt-3 flex flex-wrap gap-4">
                 <form action={toggleQuizQuestion.bind(null, q.id, !q.active)}>
+                  <input type="hidden" name="ret" value={ret} />
                   <SubmitButton className="text-xs text-muted hover:underline" pending="…">
                     {q.active ? "Retirer du quiz" : "Remettre dans le quiz"}
                   </SubmitButton>
                 </form>
                 <form action={deleteQuizQuestion.bind(null, q.id)}>
+                  <input type="hidden" name="ret" value={ret} />
                   <SubmitButton
                     className="text-xs text-danger hover:underline"
                     pending="…"
@@ -558,14 +605,33 @@ async function QuizAdmin({ cat }: { cat?: string }) {
           </li>
         ))}
       </ul>
+
+      {pages > 1 && (
+        <nav className="flex items-center justify-center gap-3 text-sm" aria-label="Pages">
+          {pageNo > 1 ? (
+            <Link href={`${base}&page=${pageNo - 1}`} className="btn-secondary">← Précédente</Link>
+          ) : (
+            <span className="btn-secondary pointer-events-none opacity-40">← Précédente</span>
+          )}
+          <span className="text-muted">
+            {pageNo} / {pages}
+          </span>
+          {pageNo < pages ? (
+            <Link href={`${base}&page=${pageNo + 1}`} className="btn-secondary">Suivante →</Link>
+          ) : (
+            <span className="btn-secondary pointer-events-none opacity-40">Suivante →</span>
+          )}
+        </nav>
+      )}
     </div>
   );
 }
 
-function QuizForm({ q, action }: { q?: QuizQ; action: (fd: FormData) => Promise<void> }) {
+function QuizForm({ q, action, ret = "" }: { q?: QuizQ; action: (fd: FormData) => Promise<void>; ret?: string }) {
   const p = q?.id ?? "new";
   return (
     <form action={action} className="mt-4 space-y-3">
+      <input type="hidden" name="ret" value={ret} />
       <div>
         <label className="label" htmlFor={`q-${p}`}>Question</label>
         <textarea id={`q-${p}`} name="question" className="field min-h-16" defaultValue={q?.question} required maxLength={500} />

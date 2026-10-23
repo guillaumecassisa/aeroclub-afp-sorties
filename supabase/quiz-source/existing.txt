@@ -1,0 +1,99 @@
+Quelle est la définition du QNH ?
+Le vent est annoncé 270/15kt. Quelle est la direction d'où vient le vent ?
+Qu'est-ce qu'un METAR ?
+Que signifie CAVOK ?
+Qu'est-ce qu'une inversion de température ?
+Quelle est la valeur standard de la pression atmosphérique au niveau de la mer (ISA) ?
+Le gradient de température standard de l'ISA est de :
+Qu'indique un SIGMET ?
+En France, au-dessus du FL195, l'espace aérien est en règle générale de classe :
+En classe G, au-dessous de 3000 ft AMSL (ou 1000 ft au-dessus du sol si c'est plus haut), quelle est la visibilité minimale VFR de base fixée par la réglementation SERA ?
+Que signifie l'acronyme CTR ?
+Un pilote VFR en classe D doit établir une communication radio bilatérale avec le contrôle avant d'entrer. C'est :
+Au-dessus d'une agglomération, quelle est la hauteur minimale de survol en VFR (règle générale SERA) ?
+Qu'est-ce qu'une TMA ?
+Deux avions convergent à peu près à la même altitude. Lequel doit céder le passage ?
+Quelle est la différence entre cap magnétique et cap vrai ?
+Qu'est-ce que le QDM ?
+Un NDB émet sur quelle gamme de fréquences ?
+Le VOR émet sur quelle gamme de fréquences ?
+Qu'est-ce que la dérive en navigation ?
+Qu'est-ce que la vitesse de décrochage ?
+Que se passe-t-il si on augmente la masse d'un avion ?
+La finesse d'un avion est le rapport entre :
+Qu'est-ce que l'effet de sol ?
+La Vne est :
+Qu'est-ce que la Va ?
+Qu'est-ce que le mixture dans un moteur à pistons ?
+Pourquoi enrichit-on le mélange en phase d'approche ?
+Quel phénomène le carburateur peut-il subir, même par température extérieure positive et air humide ?
+Le manifold pressure (MAP) mesure :
+Quel est l'indicatif OACI de l'aérodrome d'Aix-les-Milles ?
+Quelle est la fréquence de la tour d'Aix-les-Milles (LFMA) ?
+Quelle est l'orientation de la piste revêtue de LFMA ?
+Quelle est la distance d'atterrissage utilisable (LDA) en piste 14 à LFMA ?
+Quelle est l'altitude de l'aérodrome d'Aix-les-Milles (LFMA) ?
+Dans quel espace aérien se trouve l'aérodrome de LFMA ?
+Quelle est la fréquence d'urgence universelle en aviation ?
+Le circuit de piste standard se fait :
+Selon les bonnes pratiques enseignées en école, à quelle vitesse sol maximale roule-t-on habituellement sur les voies de circulation ?
+Quel instrument donne l'altitude ?
+Le variomètre indique :
+L'horizon artificiel est alimenté par :
+Qu'est-ce que la sonde de Pitot mesure ?
+La prise de pression totale (Pitot) et son orifice de purge sont bouchés, la prise statique est libre. En montée, l'anémomètre :
+Quelle fréquence VHF est réservée aux communications air-air entre pilotes en France ?
+Le transpondeur mode C fournit :
+Quel est le squawk à sélectionner en cas d'urgence (détresse) ?
+La phonie "MAYDAY MAYDAY MAYDAY" indique :
+Qu'est-ce que le terme "PAN PAN" signifie en phonie ?
+Quelle est la périodicité de publication de l'AIP France ?
+Que contient la carte VAC ?
+Qu'est-ce qu'un NOTAM ?
+La carte OACI 1/500 000 est utilisée pour :
+Qu'est-ce que la couche limite ?
+Le profil symétrique génère de la portance :
+Qu'est-ce que la traînée induite ?
+L'allongement d'une aile est :
+Qu'est-ce que la distance de roulement au décollage TORA ?
+Comment l'altitude-densité affecte-t-elle les performances ?
+Qu'est-ce que la masse maximale au décollage (MTOW) ?
+Qui a réalisé le premier vol motorisé reconnu de l'histoire ?
+Louis Blériot est célèbre pour :
+Charles Lindbergh a effectué le premier vol transatlantique solo en :
+Que signifie le sigle ULM ?
+Le Concorde a cessé ses vols commerciaux en :
+Qu'est-ce que le PPL ?
+Quelle est la vitesse du son au niveau de la mer en atmosphère standard (15°C) ?
+Qu'est-ce que le PPL Night Rating ?
+L'OACI est :
+Qu'est-ce qu'un ATPL ?
+Le Piper PA-28 Warrior est un avion :
+Le moteur Lycoming O-320 qui équipe de nombreux avions école est un moteur :
+Le Cessna 172 Skyhawk est :
+Que signifie l'acronyme POH ?
+Dans le manuel de vol, la section 3 concerne généralement :
+Qu'appelle-t-on l'« effet tunnel » en facteurs humains ?
+Qu'est-ce que le CRM (Crew Resource Management) ?
+La règle du "1 en 60" en navigation dit que :
+Qu'est-ce que la désorientation spatiale ?
+Qu'est-ce que l'hypoxie ?
+Qu'est-ce qu'un devis de masse et centrage ?
+Avant le démarrage, pourquoi effectue-t-on la visite prévol ?
+Que vérifie-t-on en drainant le carburant avant le vol ?
+L'Avgas 100LL est de quelle couleur ?
+Qu'est-ce que la troposphère ?
+La tropopause se situe en moyenne à quelle altitude aux latitudes moyennes ?
+Un cumulonimbus (CB) est dangereux car :
+Qu'est-ce que le vent de travers (crosswind) limite ?
+Qu'est-ce que la VFR de nuit requiert en plus du VFR de jour ?
+Qu'est-ce que le FL (Flight Level) ?
+Qu'est-ce que l'IFR ?
+Qu'est-ce que la visibilité RVR ?
+Qu'est-ce que le givrage de carburateur risque de provoquer ?
+Qu'est-ce que la VFE ?
+Le QFE est calé sur :
+Qu'est-ce que la déclinaison magnétique ?
+Qu'est-ce que la déviation du compas ?
+Qu'est-ce que la VY ?
+Qu'est-ce que la Vx ?
