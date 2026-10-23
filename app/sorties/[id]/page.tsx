@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Banner, StatusPill } from "@/components/Banner";
 import { Avatar } from "@/components/Avatar";
 import { SubmitButton } from "@/components/ui";
+import { CrewBoard } from "./CrewBoard";
 import { formatDateTime } from "@/lib/dates";
 import { KIND_LABELS, type OutingDetail, type OutingKind, type Person } from "@/lib/types";
 import {
@@ -59,6 +60,8 @@ export default async function Page({
   const free = capacity == null ? null : Math.max(capacity - occupants.length, 0);
   const canRegister = approved && !cancelled && !started && !deadlinePassed && !mine;
   const isMeOrganizerOnboard = !!o.is_organizer && !!o.instructor_aircraft_id;
+  // Tableau glisser-déposer pour l'organisateur (sur ordinateur ; menus conservés sur téléphone)
+  const board = organizer && isFlight && approved && !started && !cancelled && o.aircraft.length > 0;
 
   // Membres pouvant être ajoutés par un organisateur
   let addable: { id: string; full_name: string }[] = [];
@@ -213,7 +216,7 @@ export default async function Page({
 
           {/* Avions et équipages */}
           {isFlight && o.aircraft.length > 0 && (
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className={`grid gap-4 sm:grid-cols-2 ${board ? "md:hidden" : ""}`}>
               {o.aircraft.map((a) => (
                 <div key={a.id} className="card overflow-hidden">
                   <div className="flex items-center justify-between border-b border-line px-4 py-3">
@@ -259,6 +262,7 @@ export default async function Page({
           )}
 
           {o.waitlist.length > 0 && (
+            <div className={board ? "md:hidden" : ""}>
             <PeopleCard title={`Liste d'attente (${o.waitlist.length})`}>
               {o.waitlist.map((p) => (
                 <PersonRow key={p.registration_id} p={p} outingId={id} canRemove={staff && !started}>
@@ -269,6 +273,7 @@ export default async function Page({
                 </PersonRow>
               ))}
             </PeopleCard>
+            </div>
           )}
 
           {addable.length > 0 && (
@@ -293,6 +298,19 @@ export default async function Page({
           )}
         </div>
       </div>
+
+      {board && (
+        <section className="mt-6 hidden md:block">
+          <h2 className="mb-2 text-lg font-bold text-navy-2">Répartition des équipages</h2>
+          <CrewBoard
+            outingId={id}
+            aircraft={o.aircraft}
+            waitlist={o.waitlist}
+            organizer={{ name: o.instructor.full_name, avatar_url: o.instructor.avatar_url }}
+            canRemove={staff}
+          />
+        </section>
+      )}
     </>
   );
 }
