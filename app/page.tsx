@@ -75,6 +75,10 @@ export default async function Page({
   const { data: rankRaw } = approved ? await supabase.rpc("bar_ranking", { p_year: null }) : { data: [] };
   const topEquipage = (rankRaw ?? []) as { rank: number; name: string; consos: number; avatar_url: string | null }[];
 
+  // Top 5 du quiz : meilleurs scores (bonnes réponses) depuis le début
+  const { data: quizRankRaw } = approved ? await supabase.rpc("quiz_leaderboard") : { data: [] };
+  const topQuiz = ((quizRankRaw ?? []) as { user_id: string; full_name: string | null; total: number; correct: number }[]).slice(0, 5);
+
   const KIND_ICON: Record<string, string> = { vol: "✈️", activite: "🏍️", evenement: "🥂", formation: "🎓" };
 
   const now = new Date();
@@ -264,6 +268,7 @@ export default async function Page({
           )}
         </div>
 
+        <div className="space-y-6">
         {/* Équipage de l'année */}
         <div className="card overflow-hidden">
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
@@ -286,6 +291,36 @@ export default async function Page({
           <div className="border-t border-line px-4 py-2 text-right">
             <Link href="/bar" className="text-xs font-medium text-sky-600 hover:underline">Ouvrir l&apos;Espace Bar →</Link>
           </div>
+        </div>
+
+        {/* Top 5 des questions du jour */}
+        <div className="card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-line px-4 py-3">
+            <h2 className="font-bold text-navy-2">🧠 Top 5 du quiz</h2>
+            <span className="pill bg-paper text-muted">Questions du jour</span>
+          </div>
+          {topQuiz.length === 0 ? (
+            <p className="px-4 py-6 text-sm text-muted">Personne n&apos;a encore répondu. À vous de jouer !</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {topQuiz.map((m, i) => (
+                <li key={m.user_id} className={`flex items-center gap-3 px-4 py-3 text-sm ${m.user_id === profile?.id ? "bg-sky-soft" : ""}`}>
+                  <span className="w-7 text-center text-xl" aria-hidden>
+                    {i < 3 ? ["🥇", "🥈", "🥉"][i] : <span className="text-xs font-bold text-muted">#{i + 1}</span>}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate font-medium text-ink">{m.full_name ?? "Membre"}</span>
+                  <span className="text-right">
+                    <span className="font-bold text-navy-2">{m.correct}</span>
+                    <span className="text-xs text-muted"> / {m.total}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="border-t border-line px-4 py-2 text-right">
+            <Link href="/quiz" className="text-xs font-medium text-sky-600 hover:underline">Voir le classement complet →</Link>
+          </div>
+        </div>
         </div>
       </div>
 
