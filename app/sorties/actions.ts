@@ -315,3 +315,17 @@ export async function setGuestCount(outingId: string, formData: FormData) {
           (res.waitlist ? ` (${res.waitlist} en liste d'attente faute de place).` : "."),
   );
 }
+
+/** L'organisateur place d'office une personne de la liste d'attente dans un avion (même non lâchée). */
+export async function placeWaitlisted(outingId: string, registrationId: string, formData: FormData) {
+  await requireMember();
+  const aircraftId = String(formData.get("aircraft") ?? "");
+  if (!aircraftId) back(outingId, "erreur", "Choisissez un avion.");
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("place_waitlisted", { p_registration: registrationId, p_aircraft: aircraftId });
+  if (error) back(outingId, "erreur", error.message);
+  const change = data as SeatChange | null;
+  const info = await outingInfo(outingId);
+  if (info && change) await notifySeatChanges([change], info);
+  back(outingId, "ok", `${change?.full_name ?? "La personne"} est placée dans l'avion${change ? " et prévenue par email" : ""}.`);
+}

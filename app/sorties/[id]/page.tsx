@@ -14,6 +14,7 @@ import {
   cancelOuting,
   cancelRegistration,
   moveCrew,
+  placeWaitlisted,
   registerSelf,
   reviewOuting,
   setGuestCount,
@@ -262,6 +263,9 @@ export default async function Page({
               {o.waitlist.map((p) => (
                 <PersonRow key={p.registration_id} p={p} outingId={id} canRemove={staff && !started}>
                   <span className="text-xs text-muted">n° {p.position}</span>
+                  {organizer && isFlight && !started && !cancelled && (
+                    <PlaceForm outingId={id} registrationId={p.registration_id} o={o} />
+                  )}
                 </PersonRow>
               ))}
             </PeopleCard>
@@ -439,6 +443,29 @@ function GuestBox({ o, isFlight, outingId }: { o: OutingDetail; isFlight: boolea
         </select>
       </div>
       <SubmitButton className="btn-secondary" pending="…">Enregistrer</SubmitButton>
+    </form>
+  );
+}
+
+/** Organisateur : placer d'office une personne de la liste d'attente dans un avion qui a une place. */
+function PlaceForm({ outingId, registrationId, o }: { outingId: string; registrationId: string; o: OutingDetail }) {
+  const free = o.aircraft.filter((a) => a.occupants.length < a.capacity);
+  if (!free.length) return null;
+  return (
+    <form action={placeWaitlisted.bind(null, outingId, registrationId)} className="flex w-full items-center gap-1">
+      <select name="aircraft" className="field py-1 text-xs" defaultValue="" required aria-label="Placer dans un avion">
+        <option value="" disabled>
+          Placer dans…
+        </option>
+        {free.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.registration} · {a.type ?? a.model} ({a.capacity - a.occupants.length} place{a.capacity - a.occupants.length > 1 ? "s" : ""})
+          </option>
+        ))}
+      </select>
+      <SubmitButton className="btn-secondary px-2 py-1 text-xs" pending="…">
+        Placer
+      </SubmitButton>
     </form>
   );
 }
