@@ -1,0 +1,75 @@
+# Sauvegarde automatique chaque nuit : base de données + fichiers (documents, photos…),
+# chiffrée avec une phrase secrète, conservée 30 jours dans l'onglet « Actions » du dépôt.
+# Mise en place : docs/SAUVEGARDES.md
+name: Sauvegarde nocturne
+
+on:
+  schedule:
+    - cron: "17 1 * * *" # 1 h 17 UTC, chaque nuit
+  workflow_dispatch: {}   # bouton « Run workflow » pour une sauvegarde immédiate
+
+permissions:
+  contents: read
+
+jobs:
+  sauvegarde:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Vérifier la configuration
+        run: |
+          missing=""
+          for v in SUPABASE_DB_URL SUPABASE_URL SUPABASE_SERVICE_ROLE_KEY BACKUP_PASSPHRASE; do
+            [ -z "${!v}" ] && missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::warning::Sauvegarde non configurée (secrets manquants :$missing). Voir docs/SAUVEGARDES.md"
+            echo "SKIP=1" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/checkout@v4
+        if: env.SKIP != '1'
+
+      - uses: actions/setup-node@v4
+        if: env.SKIP != '1'
+        with:
+          node-version: 22
+
+      - name: Sauvegarde de la base (pg_dump)
+        if: env.SKIP != '1'
+        run: |
+          mkdir -p out
+          docker run --rm -e PGCONNECT_TIMEOUT=30 postgres:17 \
+            pg_dump "$SUPABASE_DB_URL" --no-owner --no-privileges \
+              --schema=public --schema=auth --schema=storage \
+            > out/base.sql
+          ls -lh out/base.sql
+
+      - name: Sauvegarde des fichiers (documents, photos, images du shop)
+        if: env.SKIP != '1'
+        run: |
+          npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+          node scripts/sauvegarde-fichiers.mjs out/fichiers
+
+      - name: Chiffrement
+        if: env.SKIP != '1'
+        run: |
+          stamp=$(date -u +%Y-%m-%d)
+          tar -czf - -C out . | gpg --batch --yes --pinentry-mode loopback --symmetric --cipher-algo AES256 \
+            --passphrase "$BACKUP_PASSPHRASE" -o "sauvegarde-$stamp.tar.gz.gpg"
+          rm -rf out
+          echo "FICHIER=sauvegarde-$stamp.tar.gz.gpg" >> "$GITHUB_ENV"
+          ls -lh sauvegarde-*.gpg
+
+      - uses: actions/upload-artifact@v4
+        if: env.SKIP != '1'
+        with:
+          name: ${{ env.FICHIER }}
+          path: ${{ env.FICHIER }}
+          retention-days: 30
+          compression-level: 0

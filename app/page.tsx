@@ -206,7 +206,7 @@ export default async function Page({
         {/* Flotte */}
         <div className="card overflow-hidden">
           <div className="flex items-center justify-between border-b border-line px-4 py-3">
-            <h2 className="font-bold text-navy-2">✈️ Flotte AFPA</h2>
+            <h2 className="font-bold text-navy-2">✈️ Flotte du club</h2>
             <span className="pill bg-ok-soft text-ok">
               {flotte.filter((a: { available?: boolean; unavailable_reason?: string | null }) => a.available !== false && !a.unavailable_reason).length} dispos
             </span>

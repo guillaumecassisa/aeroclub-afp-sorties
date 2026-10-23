@@ -9,7 +9,7 @@
 
 alter table public.outings add column if not exists kind text not null default 'vol';
 alter table public.outings drop constraint if exists outings_kind_check;
-alter table public.outings add constraint outings_kind_check check (kind in ('vol', 'activite', 'evenement'));
+alter table public.outings add constraint outings_kind_check check (kind in ('vol', 'activite', 'evenement', 'formation')); -- 'formation' : n°29 (permet de rejouer le fichier)
 alter table public.outings add column if not exists max_participants int check (max_participants is null or max_participants >= 1);
 alter table public.profiles add column if not exists is_board boolean not null default false;
 

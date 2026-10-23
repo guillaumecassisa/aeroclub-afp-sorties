@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { CLUB_NAME } from "@/lib/club";
 
 export type ClubInfo = {
   association_name: string;
@@ -15,7 +16,7 @@ export async function getClubInfo(): Promise<ClubInfo> {
   const supabase = await createClient();
   const { data } = await supabase.rpc("get_club_info");
   return {
-    association_name: "Aéroclub Air France Provence",
+    association_name: CLUB_NAME,
     legal_form: "Association régie par la loi du 1er juillet 1901",
     address: null,
     registration_number: null,

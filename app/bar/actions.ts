@@ -7,6 +7,8 @@ import { parseEuros } from "@/lib/money";
 import type { FormState } from "@/lib/types";
 
 function back(path: string, key: "ok" | "erreur", msg: string): never {
+  // uniquement une page du site (jamais une adresse extérieure)
+  if (!path.startsWith("/") || path.startsWith("//")) path = "/bar";
   revalidatePath("/bar");
   revalidatePath("/bar/tresorerie");
   const sep = path.includes("?") ? "&" : "?";

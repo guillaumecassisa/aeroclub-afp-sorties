@@ -2,6 +2,7 @@ import { getMetar } from "@/lib/metar";
 import { getTafs } from "@/lib/taf";
 import { getNotams, NOTAM_LOCATIONS } from "@/lib/notam";
 import { WeatherCard } from "@/components/WeatherCard";
+import { HOME_AIRFIELD, HOME_ICAO } from "@/lib/club";
 
 const CHARTS = [
   { title: "Aeroweb (Météo-France)", text: "TEMSI, WINTEM, cartes et images satellite", url: "https://aviation.meteo.fr/" },
@@ -15,9 +16,9 @@ export async function MeteoSection() {
 
   return (
     <section id="meteo" className="scroll-mt-28">
-      <h2 className="text-xl font-bold tracking-tight text-navy-2">Météo LFMA</h2>
+      <h2 className="text-xl font-bold tracking-tight text-navy-2">Météo {HOME_ICAO}</h2>
       <p className="mb-4 text-sm text-muted">
-        Observation, prévisions et NOTAM autour d&apos;Aix-les-Milles. Information indicative : consultez toujours le briefing
+        Observation, prévisions et NOTAM autour de {HOME_AIRFIELD}. Information indicative : consultez toujours le briefing
         officiel avant le vol.
       </p>
 
@@ -43,7 +44,7 @@ export async function MeteoSection() {
           ) : (
             <p className="mt-2 text-sm text-muted">TAF indisponibles pour le moment. Voir Aeroweb ou SOFIA ci-dessous.</p>
           )}
-          <p className="mt-3 text-xs text-muted">LFMA n&apos;émet pas de TAF : prévisions des terrains voisins (Marseille, Salon).</p>
+          <p className="mt-3 text-xs text-muted">Prévisions des terrains de la liste TAF_STATIONS (les terrains sans TAF n&apos;apparaissent pas).</p>
         </section>
       </div>
 
@@ -101,7 +102,7 @@ export async function MeteoSection() {
           </div>
         ) : (
           <p className="mt-2 text-sm text-muted">
-            NOTAM indisponibles pour le moment. Consultez le briefing officiel SOFIA pour LFMA et LFML.
+            NOTAM indisponibles pour le moment. Consultez le briefing officiel SOFIA pour {NOTAM_LOCATIONS.join(", ")}.
           </p>
         )}
       </section>

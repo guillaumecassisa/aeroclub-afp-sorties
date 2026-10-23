@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import "./globals.css";
-import { canManageFleet, getCurrentProfile } from "@/lib/auth";
+import { canManageDocs, canManageFleet, canTeach, getCurrentProfile, isTreasurer } from "@/lib/auth";
 import { CLUB_NAME } from "@/lib/email";
 import { logout } from "@/app/auth/actions";
 import { NavLink } from "@/components/NavLink";
@@ -19,6 +19,9 @@ export const viewport: Viewport = { themeColor: "#002157", width: "device-width"
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const profile = await getCurrentProfile();
   const approved = profile && profile.role !== "pending";
+  const manages =
+    !!profile &&
+    (profile.role === "admin" || isTreasurer(profile) || canManageFleet(profile) || canManageDocs(profile) || canTeach(profile));
 
   return (
     <html lang="fr">
@@ -49,7 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {profile && (
               <div className="flex items-center gap-1">
               {approved && (
-                <Link href="/compte" className="rounded-full px-2 py-1.5 text-sm font-medium whitespace-nowrap text-navy-2 hover:bg-sky-soft sm:px-3">
+                <Link href="/compte" className="hidden rounded-full px-2 py-1.5 text-sm font-medium whitespace-nowrap text-navy-2 hover:bg-sky-soft sm:inline-block sm:px-3">
                   Mon compte
                 </Link>
               )}
@@ -73,18 +76,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <NavLink href="/sorties">Événements</NavLink>
                 <NavLink href="/pedagogie">Espace pédagogique</NavLink>
                 <NavLink href="/preparer-son-vol">Préparer son vol</NavLink>
-                <NavLink href="/bons-plans">Bons plans</NavLink>
-                <NavLink href="/shop">Le shop</NavLink>
-                {profile?.role === "admin" && <NavLink href="/shop/admin">Shop (admin)</NavLink>}
-                <NavLink href="/bar" exact>Bar</NavLink>
-                {(profile?.role === "admin" || profile?.is_treasurer) && <NavLink href="/stats">Stats</NavLink>}
                 <NavLink href="/flotte">Flotte</NavLink>
-                {canManageFleet(profile) && <NavLink href="/maintenance">Flotte (maintenance)</NavLink>}
-                {profile?.role === "admin" && <NavLink href="/droits">Gestion des droits</NavLink>}
+                <NavLink href="/bar" exact>Bar</NavLink>
+                <NavLink href="/shop" exact>Le shop</NavLink>
                 <span className="ml-auto" aria-hidden />
+                <NavLink href="/annuaire">Annuaire</NavLink>
+                <NavLink href="/bons-plans">Bons plans</NavLink>
                 <NavLink href="/shareflight">Shareflight</NavLink>
                 <NavLink href="/quiz">Quiz</NavLink>
-                <NavLink href="/annuaire">Annuaire</NavLink>
+                {manages && <NavLink href="/gestion">⚙️ Gestion</NavLink>}
               </div>
             </nav>
           )}

@@ -1,6 +1,7 @@
 import { requireMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
+import { HOME_ICAO } from "@/lib/club";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Question du jour — Classement" };
@@ -20,7 +21,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   navigation: "🗺️ Navigation",
   mecanique: "✈️ Mécanique",
   moteur: "🔧 Moteur",
-  lfma: "🛬 LFMA",
+  lfma: `🛬 ${HOME_ICAO}`,
   instruments: "🎛️ Instruments",
   radio: "📻 Radio",
   documents: "📄 Documents",

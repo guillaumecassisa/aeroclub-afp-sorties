@@ -15,8 +15,6 @@ import { SubmitButton } from "@/components/ui";
 
 export const metadata: Metadata = { title: "Mon compte" };
 
-const RELEASE_TYPES = ["DR400", "DA40", "PS28", "WT9", "B23"];
-
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const me = await requireMember();
   const sp = await searchParams;
@@ -40,8 +38,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   const barCount = (cons ?? []).reduce((s, c) => s + c.quantity, 0);
   const weight = w?.weight_kg != null ? Number(w.weight_kg) : null;
   const released = (rel ?? []).map((r) => r.aircraft_type as string);
-  // Les trois types de lâcher du club, avec pour info les immatriculations correspondantes
-  const types = RELEASE_TYPES.map((type) => ({
+  // Types d'avions de la flotte du club, avec pour info les immatriculations correspondantes
+  const fleetTypes = [...new Set(((fleet ?? []) as Aircraft[]).filter((a) => a.active && a.type).map((a) => a.type as string))].sort();
+  const types = fleetTypes.map((type) => ({
     type,
     registrations: ((fleet ?? []) as Aircraft[])
       .filter((a) => a.active && a.type === type)

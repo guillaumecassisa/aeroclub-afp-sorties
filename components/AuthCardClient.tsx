@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 
-const CLUB_NAME = process.env.NEXT_PUBLIC_CLUB_NAME || "Aéroclub Air France Provence";
+import { CLUB_NAME } from "@/lib/club";
 
 export function AuthCardClient({ title, children }: { title: string; children: React.ReactNode }) {
   return (

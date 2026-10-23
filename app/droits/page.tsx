@@ -92,6 +92,9 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
           <Link href="/journal" className="text-sm font-semibold text-sky hover:underline">
             Journal des modifications →
           </Link>
+          <Link href="/sauvegarde" className="text-sm font-semibold text-sky hover:underline">
+            Sauvegarde →
+          </Link>
         </div>
       </div>
       <p className="mb-5 text-sm text-muted">

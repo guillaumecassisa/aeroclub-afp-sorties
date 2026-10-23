@@ -13,7 +13,7 @@ export async function addAircraft(_: FormState, formData: FormData): Promise<For
   const seats = Number(formData.get("seats"));
   const type = normalizeType(String(formData.get("type") ?? "")) || typeFromModel(model);
   if (!registration || !model) return { error: "Immatriculation et modèle obligatoires." };
-  if (seats !== 2 && seats !== 4) return { error: "Nombre de places : 2 ou 4." };
+  if (!Number.isInteger(seats) || seats < 1 || seats > 9) return { error: "Nombre de places : entre 1 et 9." };
 
   const supabase = await createClient();
   const { error } = await supabase.from("aircraft").insert({ registration, model, seats, type });

@@ -47,8 +47,11 @@ export function AddAircraftForm({
           <div>
             <label className="mb-1 block text-xs font-medium text-muted">Nombre de places *</label>
             <select name="seats" className="field" defaultValue="4">
-              <option value="2">2 places</option>
-              <option value="4">4 places</option>
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <option key={n} value={n}>
+                  {n} place{n > 1 ? "s" : ""}
+                </option>
+              ))}
             </select>
           </div>
           <div>

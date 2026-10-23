@@ -1,7 +1,8 @@
 import { formatDateTime } from "@/lib/dates";
 import type { SeatChange } from "@/lib/types";
 
-export const CLUB_NAME = process.env.NEXT_PUBLIC_CLUB_NAME || "Aéroclub Air France Provence";
+import { CLUB_NAME } from "@/lib/club";
+export { CLUB_NAME };
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "").replace(/\/$/, "");
 
 type Mail = { to?: string; bcc?: string[]; subject: string; text: string };
