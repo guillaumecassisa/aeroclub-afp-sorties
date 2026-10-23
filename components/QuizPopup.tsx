@@ -195,7 +195,7 @@ export function QuizPopup({ set, submitAnswer }: Props) {
               </button>
             ) : (
               <a href="/quiz" className="text-xs font-medium underline opacity-70 hover:opacity-100">
-                Voir le classement →
+                Mes résultats →
               </a>
             )}
           </div>

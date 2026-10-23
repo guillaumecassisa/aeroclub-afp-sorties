@@ -1,12 +1,11 @@
 import { requireMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { Avatar } from "@/components/Avatar";
 import { QUIZ_CATEGORIES } from "@/lib/quiz";
 import { QuizPopup, type DailySet } from "@/components/QuizPopup";
 import { submitQuizAnswer } from "@/app/quiz/actions";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Questions du jour — Classement" };
+export const metadata = { title: "Questions du jour — Mes résultats" };
 
 type LeaderRow = {
   user_id: string;
@@ -52,7 +51,7 @@ export default async function QuizPage() {
       <div>
         <h1 className="text-2xl font-bold text-navy-2">✈️ Questions du jour</h1>
         <p className="mt-1 text-sm text-muted">
-          Chaque jour, 3 nouvelles questions (QCM) pour réviser le pilotage, la météo, la réglementation et la navigation. Le classement est mis à jour en temps réel.
+          Chaque jour, 3 nouvelles questions (QCM) pour réviser le pilotage, la météo, la réglementation et la navigation. Le top 5 des meilleurs scores est affiché sur l'accueil.
         </p>
       </div>
 
@@ -82,47 +81,6 @@ export default async function QuizPage() {
           )}
         </div>
       )}
-
-      <div>
-        <h2 className="text-lg font-semibold text-navy-2 mb-3">🏆 Classement général</h2>
-        {leaderboard.length === 0 ? (
-          <p className="text-sm text-muted">Personne n&apos;a encore répondu. Sois le premier !</p>
-        ) : (
-          <div className="divide-y divide-line rounded-2xl border border-line overflow-hidden">
-            {leaderboard.map((row, i) => {
-              const isMe = row.user_id === profile.id;
-              const pct = row.total > 0 ? Math.round((row.correct / row.total) * 100) : 0;
-              return (
-                <div
-                  key={row.user_id}
-                  className={`flex items-center gap-3 px-4 py-3 ${isMe ? "bg-sky-soft" : "bg-white"}`}
-                >
-                  <div className="w-8 text-center text-sm font-bold text-muted shrink-0">
-                    {i < 3 ? MEDALS[i] : <span className="text-xs">#{i + 1}</span>}
-                  </div>
-                  <Avatar url={row.avatar_url} name={row.full_name ?? "?"} size="sm" />
-                  <div className="flex-1 min-w-0">
-                    <div className={`text-sm font-medium truncate ${isMe ? "text-sky" : "text-ink"}`}>
-                      {row.full_name ?? "Membre"}{isMe && " (moi)"}
-                    </div>
-                    <div className="text-xs text-muted">
-                      {row.correct}/{row.total} correctes — {pct}%
-                    </div>
-                  </div>
-                  <div className="hidden sm:block w-24 shrink-0">
-                    <div className="h-1.5 rounded-full bg-line overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-emerald-400"
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       {(myAnswers?.length ?? 0) > 0 && (
         <div>

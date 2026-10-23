@@ -75,7 +75,7 @@ export default async function Page({
   const { data: rankRaw } = approved ? await supabase.rpc("bar_ranking", { p_year: null }) : { data: [] };
   const topEquipage = (rankRaw ?? []) as { rank: number; name: string; consos: number; avatar_url: string | null }[];
 
-  // Top 5 du quiz : meilleurs scores (bonnes réponses) depuis le début
+  // Top 5 du quiz : bonnes réponses depuis le début ; à égalité, le plus de questions répondues passe devant (tri fait par la base)
   const { data: quizRankRaw } = approved ? await supabase.rpc("quiz_leaderboard") : { data: [] };
   const topQuiz = ((quizRankRaw ?? []) as { user_id: string; full_name: string | null; total: number; correct: number }[]).slice(0, 5);
 
@@ -309,16 +309,15 @@ export default async function Page({
                     {i < 3 ? ["🥇", "🥈", "🥉"][i] : <span className="text-xs font-bold text-muted">#{i + 1}</span>}
                   </span>
                   <span className="min-w-0 flex-1 truncate font-medium text-ink">{m.full_name ?? "Membre"}</span>
-                  <span className="text-right">
-                    <span className="font-bold text-navy-2">{m.correct}</span>
-                    <span className="text-xs text-muted"> / {m.total}</span>
+                  <span className="font-bold text-navy-2">
+                    {m.correct} pt{m.correct > 1 ? "s" : ""}
                   </span>
                 </li>
               ))}
             </ul>
           )}
           <div className="border-t border-line px-4 py-2 text-right">
-            <Link href="/quiz" className="text-xs font-medium text-sky-600 hover:underline">Voir le classement complet →</Link>
+            <Link href="/quiz" className="text-xs font-medium text-sky-600 hover:underline">Mes résultats →</Link>
           </div>
         </div>
         </div>
