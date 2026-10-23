@@ -6445,7 +6445,7 @@ select unnest(array['bar-04', 'avions-08', 'bar-12', 'avions-19', 'liens-19', 'c
 on conflict (name) do nothing;
 
 -- 2. Questions du quiz : gérées par le chef pilote / resp. conformité / admins -------
-grant select, insert, update on public.quiz_questions to authenticated;
+grant select, insert, update, delete on public.quiz_questions to authenticated;
 grant usage on sequence public.quiz_questions_id_seq to authenticated;
 drop policy if exists quiz_questions_teach_select on public.quiz_questions;
 create policy quiz_questions_teach_select on public.quiz_questions for select to authenticated
@@ -6465,8 +6465,11 @@ do $$ begin
       and (explanation is null or length(explanation) <= 1500)) not valid;
   end if;
 end $$;
+drop policy if exists quiz_questions_teach_delete on public.quiz_questions;
+create policy quiz_questions_teach_delete on public.quiz_questions for delete to authenticated
+  using (public.can_teach());
 drop trigger if exists zz_audit on public.quiz_questions;
-create trigger zz_audit after insert or update on public.quiz_questions
+create trigger zz_audit after insert or update or delete on public.quiz_questions
   for each row execute function public._audit();
 
 -- 3. Événements : droits des organisateurs ------------------------------------------

@@ -167,3 +167,15 @@ export async function toggleQuizQuestion(id: number, active: boolean) {
   if (error) back("quiz", "erreur", error.message);
   back("quiz", "ok", active ? "Question remise dans le quiz." : "Question retirée du quiz.");
 }
+
+/** Suppression définitive, seulement pour une question à laquelle personne n'a encore répondu. */
+export async function deleteQuizQuestion(id: number) {
+  await requireTeacher();
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("quiz_questions").delete().eq("id", id).select("id");
+  if (error?.code === "23503")
+    back("quiz", "erreur", "Des membres ont déjà répondu à cette question : utilisez « Retirer du quiz » pour garder leur historique.");
+  if (error) back("quiz", "erreur", error.message);
+  if (!data?.length) back("quiz", "erreur", "Suppression impossible : la base n'est pas à jour (mise à jour n°33).");
+  back("quiz", "ok", "Question supprimée.");
+}

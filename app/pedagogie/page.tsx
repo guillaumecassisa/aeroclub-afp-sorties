@@ -15,6 +15,7 @@ import {
   createPost,
   restorePedaDocument,
   reviewRex,
+  deleteQuizQuestion,
   saveQuizQuestion,
   toggleQuizQuestion,
   submitRex,
@@ -62,17 +63,29 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   const me = await requireMember();
   const sp = await searchParams;
   const teacher = canTeach(me);
-  const tabs = TABS.filter((t) => t.key !== "quiz" || teacher);
-  const tab: Tab = (tabs.find((t) => t.key === sp.onglet)?.key ?? "annonces") as Tab;
+  // « Questions du quiz » n'est pas un onglet : un bouton réservé au chef pilote, au resp. conformité et aux admins
+  const tabs = TABS.filter((t) => t.key !== "quiz");
+  const tab: Tab = (sp.onglet === "quiz" && teacher ? "quiz" : (tabs.find((t) => t.key === sp.onglet)?.key ?? "annonces")) as Tab;
 
   return (
     <>
       <Banner ok={sp.ok} erreur={sp.erreur} />
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold tracking-tight text-navy-2">🎓 Espace pédagogique</h1>
-        <p className="text-sm text-muted">
-          Consignes, documents de formation, retours d&apos;expérience et séances proposées par le chef pilote et le responsable conformité.
-        </p>
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-navy-2">🎓 Espace pédagogique</h1>
+          <p className="text-sm text-muted">
+            Consignes, documents de formation, retours d&apos;expérience et séances proposées par le chef pilote et le responsable conformité.
+          </p>
+        </div>
+        {teacher && (
+          <Link
+            href="/pedagogie?onglet=quiz"
+            aria-current={tab === "quiz" ? "page" : undefined}
+            className={tab === "quiz" ? "btn-primary" : "btn-secondary"}
+          >
+            ❓ Gérer le quiz
+          </Link>
+        )}
       </div>
 
       <nav className="mb-6 flex flex-wrap gap-2" aria-label="Rubriques">
@@ -492,8 +505,8 @@ async function QuizAdmin({ cat }: { cat?: string }) {
         </p>
       )}
 
-      <details className="card p-5">
-        <summary className="cursor-pointer font-semibold text-navy-2">+ Ajouter une question</summary>
+      <details className="card p-5" open={all.length === 0}>
+        <summary className="cursor-pointer font-semibold text-navy-2">+ Écrire une nouvelle question (QCM, 4 réponses)</summary>
         <QuizForm action={saveQuizQuestion.bind(null, null)} />
       </details>
 
@@ -525,11 +538,22 @@ async function QuizAdmin({ cat }: { cat?: string }) {
                 </p>
               </summary>
               <QuizForm q={q} action={saveQuizQuestion.bind(null, q.id)} />
-              <form action={toggleQuizQuestion.bind(null, q.id, !q.active)} className="mt-2">
-                <SubmitButton className="text-xs text-muted hover:underline" pending="…">
-                  {q.active ? "Retirer du quiz" : "Remettre dans le quiz"}
-                </SubmitButton>
-              </form>
+              <div className="mt-3 flex flex-wrap gap-4">
+                <form action={toggleQuizQuestion.bind(null, q.id, !q.active)}>
+                  <SubmitButton className="text-xs text-muted hover:underline" pending="…">
+                    {q.active ? "Retirer du quiz" : "Remettre dans le quiz"}
+                  </SubmitButton>
+                </form>
+                <form action={deleteQuizQuestion.bind(null, q.id)}>
+                  <SubmitButton
+                    className="text-xs text-danger hover:underline"
+                    pending="…"
+                    confirm="Supprimer définitivement cette question ?"
+                  >
+                    Supprimer définitivement
+                  </SubmitButton>
+                </form>
+              </div>
             </details>
           </li>
         ))}
