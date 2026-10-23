@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireMember, requireTeacher } from "@/lib/auth";
 import { PEDA_BUCKET, PEDA_CATEGORIES, REX_PHASES, REX_STATUS } from "@/lib/pedagogie";
 import { notifyRexSubmitted } from "@/lib/email";
+import { QUIZ_CATEGORIES } from "@/lib/quiz";
 
 function back(tab: string, key: "ok" | "erreur", msg: string): never {
   revalidatePath("/pedagogie");
@@ -129,4 +130,40 @@ export async function reviewRex(id: string, formData: FormData) {
   const { error } = await supabase.from("rex_reports").update({ status, public_summary, lessons }).eq("id", id);
   if (error) back("rex", "erreur", error.message);
   back("rex", "ok", status === "publie" ? "REX publié pour tous les membres." : "REX mis à jour.");
+}
+
+// ── Questions du quiz ───────────────────────────────────────────────────────
+
+export async function saveQuizQuestion(id: number | null, formData: FormData) {
+  await requireTeacher();
+  const v = {
+    question: text(formData, "question", 500),
+    option_a: text(formData, "option_a", 300),
+    option_b: text(formData, "option_b", 300),
+    option_c: text(formData, "option_c", 300),
+    option_d: text(formData, "option_d", 300),
+    correct: String(formData.get("correct") ?? ""),
+    explanation: text(formData, "explanation", 1500) || null,
+    category: String(formData.get("category") ?? "general"),
+    active: formData.get("active") === "on",
+  };
+  if (!v.question || !v.option_a || !v.option_b || !v.option_c || !v.option_d)
+    back("quiz", "erreur", "La question et les quatre réponses sont obligatoires.");
+  if (!["a", "b", "c", "d"].includes(v.correct)) back("quiz", "erreur", "Indiquez la bonne réponse.");
+  if (!QUIZ_CATEGORIES[v.category]) v.category = "general";
+  const supabase = await createClient();
+  const { data, error } = id
+    ? await supabase.from("quiz_questions").update(v).eq("id", id).select("id")
+    : await supabase.from("quiz_questions").insert(v).select("id");
+  if (error) back("quiz", "erreur", error.message);
+  if (!data?.length) back("quiz", "erreur", "La base n'est pas à jour : exécutez la mise à jour n°33 dans Supabase.");
+  back("quiz", "ok", id ? "Question enregistrée." : "Question ajoutée au quiz.");
+}
+
+export async function toggleQuizQuestion(id: number, active: boolean) {
+  await requireTeacher();
+  const supabase = await createClient();
+  const { error } = await supabase.from("quiz_questions").update({ active }).eq("id", id);
+  if (error) back("quiz", "erreur", error.message);
+  back("quiz", "ok", active ? "Question remise dans le quiz." : "Question retirée du quiz.");
 }

@@ -4,6 +4,20 @@
 --  « Base toi sur les manuels de vol de chaque avion, n'invente rien. »
 -- =====================================================================
 
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
 -- -------------------------------------------------------------------------
 -- PS-28 Cruiser × 5  (F-HNLR, F-HSAC, F-HUIT, F-HPSA, F-HSAA)
 --
@@ -21,6 +35,8 @@
 -- Domaine : rectangle 0.420–0.525 m × 400–600 kg
 -- -------------------------------------------------------------------------
 
+do $seed$ begin
+  if not public._seed_once('centrage-26') then return; end if;
 -- F-HNLR
 insert into public.aircraft_mb (
   aircraft_id, serial,
@@ -510,5 +526,6 @@ on conflict (aircraft_id) do update set
   envelope         = excluded.envelope,
   source           = excluded.source,
   updated_at       = now();
+end $seed$;
 
 notify pgrst, 'reload schema';

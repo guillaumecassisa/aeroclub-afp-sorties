@@ -53,6 +53,7 @@ export default async function Page() {
       items: [
         { href: "/pedagogie?onglet=rex", icon: "🛡️", title: "Retours d'expérience", text: "Analyser et publier les REX." },
         { href: "/pedagogie?onglet=annonces", icon: "📣", title: "Annonces et documents", text: "Publier dans l'Espace pédagogique." },
+        { href: "/pedagogie?onglet=quiz", icon: "❓", title: "Questions du quiz", text: "Ajouter, corriger ou retirer les questions du jour." },
       ],
     });
 

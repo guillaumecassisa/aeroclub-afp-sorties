@@ -6,6 +6,20 @@
 --   4. Liens utiles (outils de vol, réseaux) modifiables par les admins
 -- =====================================================================
 
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
 -- 1. Période d'indisponibilité ----------------------------------------
 alter table public.aircraft add column if not exists unavailable_from date;
 alter table public.aircraft add column if not exists unavailable_until date;
@@ -38,6 +52,8 @@ revoke execute on function public.set_aircraft_availability(uuid, boolean, text,
 grant execute on function public.set_aircraft_availability(uuid, boolean, text, date, date) to authenticated;
 
 -- 2. Flotte du club (n'ajoute que les avions absents, ne modifie rien d'existant)
+do $seed$ begin
+  if not public._seed_once('avions-19') then return; end if;
 insert into public.aircraft (registration, model, type, seats)
 select v.reg, v.model, v.type, v.seats
 from (values
@@ -53,6 +69,7 @@ from (values
   ('F-HXAF', 'Diamond DA40',  'DA40',  4)
 ) v(reg, model, type, seats)
 where not exists (select 1 from public.aircraft a where upper(a.registration) = v.reg);
+end $seed$;
 
 -- 3. Chiffres de l'accueil ---------------------------------------------
 alter table public.profiles add column if not exists show_in_bar_ranking boolean not null default true;
@@ -134,6 +151,8 @@ create policy club_links_update on public.club_links for update to authenticated
 drop policy if exists club_links_delete on public.club_links;
 create policy club_links_delete on public.club_links for delete to authenticated using (public.app_role() = 'admin');
 
+do $seed$ begin
+  if not public._seed_once('liens-19') then return; end if;
 insert into public.club_links (section, title, subtitle, url, icon, position)
 select v.section, v.title, v.subtitle, v.url, v.icon, v.pos
 from (values
@@ -148,6 +167,7 @@ from (values
   ('liens', 'Instagram', '@airfranceprovenceaviation', 'https://www.instagram.com/airfranceprovenceaviation', '📷', 3)
 ) v(section, title, subtitle, url, icon, pos)
 where not exists (select 1 from public.club_links l where l.title = v.title);
+end $seed$;
 
 -- Journal : les liens aussi sont tracés
 drop trigger if exists zz_audit on public.club_links;

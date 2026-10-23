@@ -7,6 +7,7 @@ import { SubmitButton } from "@/components/ui";
 import { dayBadge, formatDate, formatTime } from "@/lib/dates";
 import { PEDA_BUCKET, PEDA_CATEGORIES, REX_PHASES, REX_STATUS, phaseLabel } from "@/lib/pedagogie";
 import type { OutingSummary } from "@/lib/types";
+import { QUIZ_CATEGORIES } from "@/lib/quiz";
 import { PedaUploader } from "./PedaUploader";
 import {
   archivePedaDocument,
@@ -14,6 +15,8 @@ import {
   createPost,
   restorePedaDocument,
   reviewRex,
+  saveQuizQuestion,
+  toggleQuizQuestion,
   submitRex,
 } from "./actions";
 
@@ -25,6 +28,7 @@ const TABS = [
   { key: "documents", label: "Documents", icon: "📚" },
   { key: "rex", label: "Retours d'expérience", icon: "🛡️" },
   { key: "formations", label: "Formations", icon: "🎓" },
+  { key: "quiz", label: "Questions du quiz", icon: "❓" },
 ] as const;
 type Tab = (typeof TABS)[number]["key"];
 
@@ -57,8 +61,9 @@ type PublishedRex = { id: string; title: string; phase: string; month: string; s
 export default async function Page({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const me = await requireMember();
   const sp = await searchParams;
-  const tab: Tab = (TABS.find((t) => t.key === sp.onglet)?.key ?? "annonces") as Tab;
   const teacher = canTeach(me);
+  const tabs = TABS.filter((t) => t.key !== "quiz" || teacher);
+  const tab: Tab = (tabs.find((t) => t.key === sp.onglet)?.key ?? "annonces") as Tab;
 
   return (
     <>
@@ -71,7 +76,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
       </div>
 
       <nav className="mb-6 flex flex-wrap gap-2" aria-label="Rubriques">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <Link
             key={t.key}
             href={`/pedagogie?onglet=${t.key}`}
@@ -89,6 +94,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
       {tab === "documents" && <Documents teacher={teacher} />}
       {tab === "rex" && <RexTab teacher={teacher} myId={me.id} />}
       {tab === "formations" && <Formations organizer={canOrganize(me)} />}
+      {tab === "quiz" && teacher && <QuizAdmin cat={sp.cat} />}
     </>
   );
 }
@@ -448,5 +454,133 @@ async function Formations({ organizer }: { organizer: boolean }) {
         );
       })}
     </div>
+  );
+}
+
+// ── Questions du quiz (chef pilote, resp. conformité, admins) ───────────────
+
+type QuizQ = {
+  id: number;
+  question: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct: string;
+  explanation: string | null;
+  category: string;
+  active: boolean;
+};
+
+async function QuizAdmin({ cat }: { cat?: string }) {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("quiz_questions").select("*").order("category").order("id");
+  const all = (data ?? []) as QuizQ[];
+  const shown = cat ? all.filter((q) => q.category === cat) : all;
+  const counts = new Map<string, number>();
+  for (const q of all) counts.set(q.category, (counts.get(q.category) ?? 0) + 1);
+
+  return (
+    <div className="space-y-5">
+      <p className="text-sm text-muted">
+        Une question par jour est tirée parmi les questions actives ({all.filter((q) => q.active).length}). Vérifiez chaque
+        réponse avec les documents de référence (VAC, AIP, manuels de vol) : le quiz sert à apprendre.
+      </p>
+      {error && (
+        <p className="rounded-lg bg-wait-soft px-4 py-3 text-sm text-wait">
+          La base n&apos;est pas à jour : exécutez la mise à jour n°33 dans Supabase pour gérer les questions.
+        </p>
+      )}
+
+      <details className="card p-5">
+        <summary className="cursor-pointer font-semibold text-navy-2">+ Ajouter une question</summary>
+        <QuizForm action={saveQuizQuestion.bind(null, null)} />
+      </details>
+
+      <nav className="flex flex-wrap gap-2 text-sm" aria-label="Catégories">
+        <Link href="/pedagogie?onglet=quiz" className={`pill ${!cat ? "bg-navy-2 text-white" : "bg-white text-navy-2"}`}>
+          Toutes ({all.length})
+        </Link>
+        {Object.entries(QUIZ_CATEGORIES)
+          .filter(([k]) => counts.has(k))
+          .map(([k, label]) => (
+            <Link key={k} href={`/pedagogie?onglet=quiz&cat=${k}`} className={`pill ${cat === k ? "bg-navy-2 text-white" : "bg-white text-navy-2"}`}>
+              {label} ({counts.get(k)})
+            </Link>
+          ))}
+      </nav>
+
+      <ul className="space-y-2">
+        {shown.map((q) => (
+          <li key={q.id} className={`card p-4 ${q.active ? "" : "opacity-60"}`}>
+            <details>
+              <summary className="cursor-pointer list-none">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="min-w-0 flex-1 text-sm font-medium text-ink">{q.question}</p>
+                  <span className="pill bg-sky-soft text-navy-2">{QUIZ_CATEGORIES[q.category] ?? q.category}</span>
+                  {!q.active && <span className="pill bg-paper text-muted">retirée</span>}
+                </div>
+                <p className="mt-1 text-xs text-ok">
+                  Réponse : {q.correct.toUpperCase()}. {q[`option_${q.correct}` as "option_a"]}
+                </p>
+              </summary>
+              <QuizForm q={q} action={saveQuizQuestion.bind(null, q.id)} />
+              <form action={toggleQuizQuestion.bind(null, q.id, !q.active)} className="mt-2">
+                <SubmitButton className="text-xs text-muted hover:underline" pending="…">
+                  {q.active ? "Retirer du quiz" : "Remettre dans le quiz"}
+                </SubmitButton>
+              </form>
+            </details>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function QuizForm({ q, action }: { q?: QuizQ; action: (fd: FormData) => Promise<void> }) {
+  const p = q?.id ?? "new";
+  return (
+    <form action={action} className="mt-4 space-y-3">
+      <div>
+        <label className="label" htmlFor={`q-${p}`}>Question</label>
+        <textarea id={`q-${p}`} name="question" className="field min-h-16" defaultValue={q?.question} required maxLength={500} />
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {(["a", "b", "c", "d"] as const).map((k) => (
+          <div key={k}>
+            <label className="label" htmlFor={`o${k}-${p}`}>Réponse {k.toUpperCase()}</label>
+            <input id={`o${k}-${p}`} name={`option_${k}`} className="field" defaultValue={q?.[`option_${k}`]} required maxLength={300} />
+          </div>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <label className="label" htmlFor={`c-${p}`}>Bonne réponse</label>
+          <select id={`c-${p}`} name="correct" className="field" defaultValue={q?.correct ?? ""} required>
+            <option value="" disabled>…</option>
+            {["a", "b", "c", "d"].map((k) => (
+              <option key={k} value={k}>{k.toUpperCase()}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="label" htmlFor={`cat-${p}`}>Catégorie</label>
+          <select id={`cat-${p}`} name="category" className="field" defaultValue={q?.category ?? "general"}>
+            {Object.entries(QUIZ_CATEGORIES).map(([k, label]) => (
+              <option key={k} value={k}>{label}</option>
+            ))}
+          </select>
+        </div>
+        <label className="flex items-center gap-2 pb-2 text-sm text-ink">
+          <input type="checkbox" name="active" defaultChecked={q?.active ?? true} className="h-4 w-4 accent-sky" /> Active
+        </label>
+      </div>
+      <div>
+        <label className="label" htmlFor={`e-${p}`}>Explication (affichée après la réponse)</label>
+        <textarea id={`e-${p}`} name="explanation" className="field min-h-16" defaultValue={q?.explanation ?? ""} maxLength={1500} />
+      </div>
+      <SubmitButton pending="Enregistrement…">{q ? "Enregistrer" : "Ajouter"}</SubmitButton>
+    </form>
   );
 }

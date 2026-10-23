@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { parseEnvelope, parseStations } from "@/lib/mb";
+import { canManageFleet, requireMember } from "@/lib/auth";
 
 function back(id: string, key: "ok" | "erreur", msg: string): never {
   revalidatePath(`/flotte/${id}/centrage`);
@@ -18,6 +19,7 @@ const num = (v: FormDataEntryValue | null) => {
 };
 
 export async function saveMb(aircraftId: string, formData: FormData) {
+  if (!canManageFleet(await requireMember())) back(aircraftId, "erreur", "Modification réservée aux administrateurs et responsables maintenance.");
   const stations = parseStations(String(formData.get("stations") ?? ""));
   if (typeof stations === "string") back(aircraftId, "erreur", stations);
   const envelope = parseEnvelope(String(formData.get("envelope") ?? ""));
@@ -52,6 +54,7 @@ export async function saveMb(aircraftId: string, formData: FormData) {
 
 /** Reprend les données « type » (postes, domaine, carburant, MTOW) d'un autre avion. */
 export async function copyTypeData(aircraftId: string, formData: FormData) {
+  if (!canManageFleet(await requireMember())) back(aircraftId, "erreur", "Modification réservée aux administrateurs et responsables maintenance.");
   const from = String(formData.get("from") ?? "");
   if (!from) back(aircraftId, "erreur", "Choisissez l'avion à copier.");
   const supabase = await createClient();

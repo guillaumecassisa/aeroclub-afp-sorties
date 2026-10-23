@@ -111,6 +111,7 @@ export type OutingDetail = {
   approval?: Approval;
   rejection_reason?: string | null;
   can_edit?: boolean;
+  can_remove?: boolean;
   is_organizer?: boolean;
   organizer_weight_kg?: number | null;
   kind?: OutingKind;

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { parseEuros } from "@/lib/money";
 import type { FormState } from "@/lib/types";
+import { isTreasurer, requireMember, requireTreasurer } from "@/lib/auth";
 
 function back(path: string, key: "ok" | "erreur", msg: string): never {
   // uniquement une page du site (jamais une adresse extérieure)
@@ -16,6 +17,7 @@ function back(path: string, key: "ok" | "erreur", msg: string): never {
 }
 
 export async function addConsumption(productId: string, productName: string, formData: FormData) {
+  await requireMember();
   const quantity = Math.max(1, Math.min(20, Number(formData.get("quantity") ?? 1) || 1));
   const supabase = await createClient();
   const { error } = await supabase.rpc("add_consumption", { p_product: productId, p_quantity: quantity });
@@ -24,6 +26,7 @@ export async function addConsumption(productId: string, productName: string, for
 }
 
 export async function cancelConsumption(id: string, returnTo: string) {
+  await requireMember();
   const supabase = await createClient();
   const { error } = await supabase.rpc("cancel_consumption", { p_id: id });
   if (error) back(returnTo, "erreur", error.message);
@@ -33,6 +36,7 @@ export async function cancelConsumption(id: string, returnTo: string) {
 // ---- Trésorier -------------------------------------------------------------
 
 export async function setPaid(userId: string, month: string, paid: boolean) {
+  await requireTreasurer();
   const supabase = await createClient();
   const { error } = await supabase.rpc("set_bar_paid", { p_user: userId, p_month: `${month}-01`, p_paid: paid });
   const path = `/bar/tresorerie?mois=${month}`;
@@ -42,6 +46,7 @@ export async function setPaid(userId: string, month: string, paid: boolean) {
 }
 
 export async function saveProduct(id: string, _: FormState, formData: FormData): Promise<FormState> {
+  if (!isTreasurer(await requireMember())) return { error: "Réservé au trésorier." };
   const name = String(formData.get("name") ?? "").trim();
   const price = parseEuros(String(formData.get("price") ?? ""));
   const active = formData.get("active") === "on";
@@ -57,6 +62,7 @@ export async function saveProduct(id: string, _: FormState, formData: FormData):
 }
 
 export async function addProduct(_: FormState, formData: FormData): Promise<FormState> {
+  if (!isTreasurer(await requireMember())) return { error: "Réservé au trésorier." };
   const name = String(formData.get("name") ?? "").trim();
   const price = parseEuros(String(formData.get("price") ?? ""));
   const category = formData.get("category") === "snacks" ? "snacks" : "boissons";

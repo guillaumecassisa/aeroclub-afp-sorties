@@ -4,6 +4,22 @@
 --  consommations garde le nom et le prix de l'époque). Les produits qui ne
 --  sont plus à la carte sont masqués, jamais supprimés.
 -- =====================================================================
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
+do $seed$ begin
+  if not public._seed_once('bar-22') then return; end if;
 with carte (name, aliases, price, pos, cat) as (values
   ('Tourtel',          array['tourtel'],                                150,  1, 'boissons'),
   ('Bud',              array['bud'],                                    200,  2, 'boissons'),
@@ -48,5 +64,6 @@ ins as (
 update public.bar_products p set active = false
  where p.active
    and p.id not in (select id from upd union all select id from ins);
+end $seed$;
 
 notify pgrst, 'reload schema';

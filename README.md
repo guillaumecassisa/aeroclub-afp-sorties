@@ -41,7 +41,13 @@ Pas à pas complet : **[docs/NOUVEAU-CLUB.md](docs/NOUVEAU-CLUB.md)**. En résum
 3. Créer son compte puis se nommer administrateur (une requête SQL).
 
 Mise à jour d'une installation existante : exécuter dans Supabase les nouveaux fichiers
-`supabase/migration-NN-….sql` **avant** de déployer le site.
+`supabase/migration-NN-….sql` **avant** de déployer le site (ou `supabase/mise-a-jour-complete.sql`,
+qui peut être relancé sans risque : il ne recrée aucune donnée d'exemple et ne modifie rien de ce
+qui a été saisi sur le site).
+
+Développeurs : après avoir ajouté ou modifié une migration, reconstruire les deux fichiers
+« tout-en-un » avec `sh scripts/assembler-sql.sh`, puis lancer les tests de la base avec
+`sh tests/run.sh` (PostgreSQL local).
 
 ## Sauvegardes
 
@@ -65,7 +71,7 @@ app/                       Pages (une par rubrique) et actions serveur
 components/                Éléments d'interface partagés
 lib/                       Accès aux données, droits (auth.ts), emails, météo, paramètres du club (club.ts)
 public/outils/             Calculateur de performances
-scripts/                   Sauvegarde / restauration des fichiers
+scripts/                   Sauvegarde / restauration des fichiers, assemblage des fichiers SQL
 tests/                     Tests SQL
 docs/                      Installation d'un nouveau club, sauvegardes
 ```

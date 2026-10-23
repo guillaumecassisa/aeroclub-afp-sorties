@@ -7,6 +7,20 @@
 --      de vol et les fiches de pesée fournis (Inside, export du 25/09/2026)
 -- =====================================================================
 
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
 -- 1. Catégorie « equipements »
 alter table public.aircraft_documents drop constraint if exists aircraft_documents_category_check;
 alter table public.aircraft_documents add constraint aircraft_documents_category_check
@@ -17,6 +31,8 @@ alter table public.aircraft_mb add column if not exists mzfw numeric(7,2) check 
 
 -- 3. Données par avion. Ne remplace que des fiches jamais retouchées à la main
 --    (vides, pré-remplies depuis Inside, ou issues de ce même import).
+do $seed$ begin
+  if not public._seed_once('centrage-21') then return; end if;
 with src (reg, serial, empty_mass, empty_moment, mtow, mlw, mzfw, fuel_arm, fuel_capacity_l, stations, envelope, source) as (
   values
   -- PS-28 Cruiser : manuel de vol PS-POH-1-1-11 §2 et §6 ; domaine 420–525 mm (28–35 % MAC)
@@ -82,5 +98,6 @@ on conflict (aircraft_id) do update set
 where m.source is null
    or m.source like 'Repris de l''outil Inside%'
    or m.source like '%[import 2026-09-25]';
+end $seed$;
 
 notify pgrst, 'reload schema';

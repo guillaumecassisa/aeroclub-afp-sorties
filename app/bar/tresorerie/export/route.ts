@@ -13,7 +13,11 @@ export async function GET(request: NextRequest) {
 
   const s = data as BarMonthSummary;
   const productNames = s.products.map((p) => p.name);
-  const esc = (v: string) => (/[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  // Une cellule qui commence par = + - @ serait exécutée comme une formule par Excel : on la neutralise
+  const esc = (raw: string) => {
+    const v = /^[=+\-@\t\r]/.test(raw) && !/^-?\d/.test(raw) ? `'${raw}` : raw;
+    return /[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+  };
   const money = (c: number) => (c / 100).toFixed(2).replace(".", ",");
 
   const lines = [

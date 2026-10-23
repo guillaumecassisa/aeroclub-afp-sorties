@@ -3,6 +3,20 @@
 --  À exécuter une fois dans Supabase > SQL Editor > New query > Run.
 -- =====================================================================
 
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
 -- 1. Trésorier : un membre (de n'importe quel rôle) désigné par un admin --
 alter table public.profiles add column if not exists is_treasurer boolean not null default false;
 
@@ -35,9 +49,12 @@ create table if not exists public.bar_products (
   created_at   timestamptz not null default now()
 );
 
+do $seed$ begin
+  if not public._seed_once('bar-04') then return; end if;
 insert into public.bar_products (name, price_cents, position)
 select * from (values ('Tourtel', 200, 1), ('Bière', 300, 2), ('Coca', 100, 3), ('Eau', 50, 4)) v(name, price, pos)
 where not exists (select 1 from public.bar_products);
+end $seed$;
 
 -- 3. Consommations (le prix est figé au moment de la consommation) --------
 create table if not exists public.bar_consumptions (

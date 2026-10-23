@@ -1,7 +1,7 @@
 import { requireMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Avatar } from "@/components/Avatar";
-import { HOME_ICAO } from "@/lib/club";
+import { QUIZ_CATEGORIES } from "@/lib/quiz";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Question du jour — Classement" };
@@ -15,24 +15,7 @@ type LeaderRow = {
 };
 
 const MEDALS = ["🥇", "🥈", "🥉"];
-const CATEGORY_LABELS: Record<string, string> = {
-  meteo: "☁️ Météo",
-  reglementation: "📋 Réglementation",
-  navigation: "🗺️ Navigation",
-  mecanique: "✈️ Mécanique",
-  moteur: "🔧 Moteur",
-  lfma: `🛬 ${HOME_ICAO}`,
-  instruments: "🎛️ Instruments",
-  radio: "📻 Radio",
-  documents: "📄 Documents",
-  aerodynamique: "🌊 Aérodynamique",
-  performances: "📊 Performances",
-  culture: "🌍 Culture",
-  flotte: "🛩️ Flotte",
-  securite: "🛡️ Sécurité",
-  sol: "⛽ Sol",
-  general: "✈️ Général",
-};
+const CATEGORY_LABELS = QUIZ_CATEGORIES;
 
 export default async function QuizPage() {
   const profile = await requireMember();

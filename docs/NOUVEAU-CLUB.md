@@ -45,6 +45,8 @@ ou depuis le site lui-même.
 | Carte du bar | site → ⚙️ Gestion → Trésorerie du bar |
 | Articles du shop | site → ⚙️ Gestion → Shop (gestion) |
 | Liens utiles (Préparer son vol) | site → ⚙️ Gestion → Liens utiles |
+| Questions du quiz (le quiz démarre vide) | site → ⚙️ Gestion → Questions du quiz (chef pilote, resp. conformité ou admin) |
+| Types d'avions proposés pour les lâchers | automatique : ce sont les types des avions de votre flotte |
 
 ## 5. Premier administrateur
 
@@ -66,4 +68,5 @@ bouton de téléchargement manuel dans ⚙️ Gestion → Sauvegarde.
 
 Quand le projet d'origine évolue, récupérez les changements dans votre dépôt, puis exécutez dans
 Supabase le ou les nouveaux fichiers `supabase/migration-NN-….sql` **avant** de redéployer le site.
-`supabase/mise-a-jour-complete.sql` peut aussi être rejoué en entier : il ne casse rien de ce qui existe.
+`supabase/mise-a-jour-complete.sql` peut aussi être rejoué en entier : il n'ajoute que ce qui manque,
+ne recrée jamais les données d'exemple de l'AFPA et ne modifie rien de ce qui a été saisi sur le site.

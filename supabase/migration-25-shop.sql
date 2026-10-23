@@ -3,6 +3,20 @@
 --  À exécuter une fois dans Supabase > SQL Editor > New query > Run.
 -- =====================================================================
 
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
 -- Table des articles du shop
 create table if not exists public.shop_items (
   id          uuid primary key default gen_random_uuid(),
@@ -76,6 +90,8 @@ create trigger touch_shop_order
 
 -- Quelques articles d'exemple (à adapter / supprimer)
 -- (seulement si le catalogue est vide, pour pouvoir relancer ce fichier sans créer de doublons)
+do $seed$ begin
+  if not public._seed_once('shop-25') then return; end if;
 insert into public.shop_items (name, description, price_cents, category, sizes, colors, position)
 select * from (values
   ('T-shirt club', 'T-shirt coton 100% aux couleurs du club, logo brodé au cœur', 2500, 'Vêtements', 'XS,S,M,L,XL,XXL', 'Blanc,Marine', 1),
@@ -85,6 +101,7 @@ select * from (values
   ('Sticker pack', 'Pack de 5 stickers vinyle : logo club, LFMA, avions de la flotte…', 500, 'Accessoires', null, null, 5)
 ) as v(name, description, price_cents, category, sizes, colors, position)
 where not exists (select 1 from public.shop_items);
+end $seed$;
 
 -- Colonnes ajoutées depuis (nom et prix figés à la commande, débit de l'ardoise)
 alter table public.shop_orders

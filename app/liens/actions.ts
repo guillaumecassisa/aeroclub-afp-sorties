@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/auth";
 
 function back(key: "ok" | "erreur", msg: string): never {
   revalidatePath("/");
@@ -22,6 +23,7 @@ function read(formData: FormData) {
 }
 
 export async function addLink(formData: FormData) {
+  await requireAdmin();
   const v = read(formData);
   if (!v.title || !v.url) back("erreur", "Titre et adresse obligatoires.");
   const supabase = await createClient();
@@ -31,6 +33,7 @@ export async function addLink(formData: FormData) {
 }
 
 export async function updateLink(id: string, formData: FormData) {
+  await requireAdmin();
   const v = read(formData);
   if (!v.title || !v.url) back("erreur", "Titre et adresse obligatoires.");
   const supabase = await createClient();
@@ -41,6 +44,7 @@ export async function updateLink(id: string, formData: FormData) {
 }
 
 export async function deleteLink(id: string) {
+  await requireAdmin();
   const supabase = await createClient();
   const { error } = await supabase.from("club_links").delete().eq("id", id);
   if (error) back("erreur", error.message);

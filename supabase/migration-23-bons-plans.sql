@@ -4,6 +4,20 @@
 --  validé peut en ajouter ; l'auteur ou un administrateur peut le modifier
 --  ou le retirer (archivage : rien n'est effacé).
 -- =====================================================================
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
 create table if not exists public.airfield_tips (
   id            uuid primary key default gen_random_uuid(),
   icao          text not null check (icao ~ '^[A-Z]{2}[A-Z0-9]{2}$'),
@@ -41,10 +55,13 @@ create trigger zz_audit after insert or update on public.airfield_tips
   for each row execute function public._audit();
 
 -- Premier bon plan (repris d'Inside)
+do $seed$ begin
+  if not public._seed_once('bons-plans-23') then return; end if;
 insert into public.airfield_tips (icao, airfield_name, lat, lon, category, title, description, on_field, contact, created_by)
 select 'LFTF', 'Cuers-Pierrefeu', 43.2476, 6.1267, 'resto', 'Le Saint Tex',
        'Un restaurant sympathique sur l''AD avec une carte restreinte composée de plats traditionnels faits maison (tartare, pâtes carbonara, entrecôte-frites).',
        true, 'https://www.facebook.com/lesainttex/', null
 where not exists (select 1 from public.airfield_tips where icao = 'LFTF' and title = 'Le Saint Tex');
+end $seed$;
 
 notify pgrst, 'reload schema';

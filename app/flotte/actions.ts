@@ -3,6 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { DOC_BUCKET, DOC_CATEGORIES } from "@/lib/docs";
+import { canManageDocs, requireMember } from "@/lib/auth";
+
+async function docManager() {
+  return canManageDocs(await requireMember());
+}
 
 type NewDoc = {
   aircraftId: string;
@@ -16,6 +21,7 @@ type NewDoc = {
 
 /** Enregistre un document déjà envoyé dans le stockage par le navigateur. */
 export async function registerDocument(doc: NewDoc): Promise<{ error?: string }> {
+  if (!(await docManager())) return { error: "Réservé aux instructeurs et aux fonctions du club." };
   const category = DOC_CATEGORIES.some((c) => c.key === doc.category) ? doc.category : "autre";
   const title = (doc.title || doc.fileName).trim().slice(0, 200);
   if (!doc.path.startsWith(`${doc.aircraftId}/`)) return { error: "Chemin de fichier invalide." };
@@ -39,6 +45,7 @@ export async function registerDocument(doc: NewDoc): Promise<{ error?: string }>
 }
 
 export async function updateDocument(id: string, aircraftId: string, formData: FormData): Promise<void> {
+  if (!(await docManager())) return;
   const title = String(formData.get("title") ?? "").trim().slice(0, 200);
   const category = String(formData.get("category") ?? "");
   if (!title || !DOC_CATEGORIES.some((c) => c.key === category)) return;
@@ -49,6 +56,7 @@ export async function updateDocument(id: string, aircraftId: string, formData: F
 }
 
 export async function deleteDocument(id: string, aircraftId: string): Promise<void> {
+  if (!(await docManager())) return;
   // Pas d'effacement : le document est archivé (récupérable, fichier conservé, action journalisée)
   const supabase = await createClient();
   const { error } = await supabase.rpc("archive_document", { p_id: id, p_archive: true });
@@ -58,6 +66,7 @@ export async function deleteDocument(id: string, aircraftId: string): Promise<vo
 }
 
 export async function restoreDocument(id: string, aircraftId: string): Promise<void> {
+  if (!(await docManager())) return;
   const supabase = await createClient();
   const { error } = await supabase.rpc("archive_document", { p_id: id, p_archive: false });
   if (error) { console.error("[restoreDocument]", error.message); return; }

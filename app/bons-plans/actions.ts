@@ -67,6 +67,6 @@ export async function archiveTip(id: string, icao: string) {
     .eq("id", id)
     .select("id");
   if (error) back("erreur", error.message, icao);
-  if (!data?.length) back("erreur", "Seul l'auteur ou un administrateur peut retirer ce bon plan.", icao);
+  if (!data?.length) back("erreur", "Seul un administrateur peut retirer ce bon plan.", icao);
   back("ok", "Bon plan retiré.", icao);
 }

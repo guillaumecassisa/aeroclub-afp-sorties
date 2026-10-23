@@ -3,6 +3,20 @@
 --  et la dernière fiche de pesée). Lecture : tous les membres validés.
 --  Modification : administrateurs et responsables maintenance.
 -- =====================================================================
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
 create table if not exists public.aircraft_mb (
   aircraft_id     uuid primary key references public.aircraft (id) on delete cascade,
   serial          text,                               -- n° de série
@@ -38,6 +52,8 @@ create trigger zz_audit after insert or update on public.aircraft_mb
 -- Pré-remplissage F-HSAA (valeurs relevées dans l'outil Inside AFPA : masse et moment à vide,
 -- postes de chargement, MTOW). Le bras carburant et le domaine de centrage restent à saisir
 -- depuis le manuel de vol avant que le calcul soit disponible.
+do $seed$ begin
+  if not public._seed_once('centrage-20') then return; end if;
 insert into public.aircraft_mb (aircraft_id, serial, empty_mass, empty_moment, mtow, stations, source)
 select a.id, 'C0502', 393.5, 169.8, 600,
        '[{"label":"Pilote","arm":0.70,"max":115},{"label":"Passager","arm":0.70,"max":115},{"label":"Bagages coffre AR","arm":1.31,"max":18}]'::jsonb,
@@ -45,5 +61,6 @@ select a.id, 'C0502', 393.5, 169.8, 600,
 from public.aircraft a
 where a.registration = 'F-HSAA'
   and not exists (select 1 from public.aircraft_mb m where m.aircraft_id = a.id);
+end $seed$;
 
 notify pgrst, 'reload schema';

@@ -1,5 +1,24 @@
--- Mise à jour complète (n°2 à n°32) : peut être exécutée même si une partie a déjà été passée.
--- Elle ne contient aucune commande \i : elle se colle telle quelle dans Supabase > SQL Editor.
+-- =====================================================================
+--  MISE À JOUR COMPLÈTE (n°2 à n°33) d'une base existante.
+--  Peut être relancée autant de fois que nécessaire : elle n'ajoute que ce qui
+--  manque et ne modifie aucune donnée saisie sur le site.
+--  Supabase > SQL Editor > New query > coller tout le fichier > Run.
+--  Fichier généré par scripts/assembler-sql.sh : ne pas le modifier à la main.
+-- =====================================================================
+-- Base déjà en service : ses données d'exemple sont déjà en place, on ne les repose jamais.
+do $boot$ begin
+  if to_regclass('public._seeds') is null and exists (select 1 from public.profiles) then
+    create table public._seeds (name text primary key, done_at timestamptz not null default now());
+    insert into public._seeds (name)
+    select unnest(array['bar-04', 'avions-08', 'bar-12', 'avions-19', 'liens-19', 'centrage-20', 'centrage-21',
+                        'bar-22', 'bons-plans-23', 'shop-25', 'centrage-26']);
+  end if;
+end $boot$;
+
+
+-- =====================================================================
+-- migration-02-profil.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°2 : photo de profil, coordonnées, avions « lâchés »
 --  À exécuter une fois dans Supabase > SQL Editor > New query > Run.
@@ -135,6 +154,11 @@ grant execute on function public.get_outing(uuid) to authenticated;
 
 -- Rafraîchit l'API
 notify pgrst, 'reload schema';
+
+
+-- =====================================================================
+-- migration-03-lachers-par-type.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°3 : les lâchers se font par TYPE d'avion (DR400, PS28…)
 --  et non plus par immatriculation.
@@ -259,10 +283,29 @@ grant execute on function public.get_outing(uuid) to authenticated;
 
 -- Rafraîchit l'API
 notify pgrst, 'reload schema';
+
+
+-- =====================================================================
+-- migration-04-bar.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°4 : le Bar de l'aéroclub
 --  À exécuter une fois dans Supabase > SQL Editor > New query > Run.
 -- =====================================================================
+
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
 
 -- 1. Trésorier : un membre (de n'importe quel rôle) désigné par un admin --
 alter table public.profiles add column if not exists is_treasurer boolean not null default false;
@@ -296,9 +339,12 @@ create table if not exists public.bar_products (
   created_at   timestamptz not null default now()
 );
 
+do $seed$ begin
+  if not public._seed_once('bar-04') then return; end if;
 insert into public.bar_products (name, price_cents, position)
 select * from (values ('Tourtel', 200, 1), ('Bière', 300, 2), ('Coca', 100, 3), ('Eau', 50, 4)) v(name, price, pos)
 where not exists (select 1 from public.bar_products);
+end $seed$;
 
 -- 3. Consommations (le prix est figé au moment de la consommation) --------
 create table if not exists public.bar_consumptions (
@@ -477,6 +523,11 @@ grant execute on function public.set_bar_paid(uuid, date, boolean) to authentica
 
 -- Rafraîchit l'API
 notify pgrst, 'reload schema';
+
+
+-- =====================================================================
+-- migration-05-annuaire.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°5 : annuaire des membres (nom, téléphone, lâchers)
 --  Visible par tous les membres validés. L'adresse et la personne à
@@ -507,7 +558,9 @@ grant execute on function public.member_directory() to authenticated;
 notify pgrst, 'reload schema';
 
 
--- ===================== Mise à jour n°6 : propositions de sorties =====================
+-- =====================================================================
+-- migration-06-propositions.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°6 : propositions de sorties par les membres
 --  Un membre propose ; un instructeur ou un administrateur approuve
@@ -879,7 +932,9 @@ grant execute on function public.review_outing(uuid, boolean, text) to authentic
 notify pgrst, 'reload schema';
 
 
--- ===================== Mise à jour n°7 : poids =====================
+-- =====================================================================
+-- migration-07-poids.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°7 : poids des pilotes (facultatif)
 --  Stocké à part : chaque membre ne voit que le sien ; seul l'organisateur
@@ -985,12 +1040,28 @@ grant execute on function public.get_outing(uuid) to authenticated;
 notify pgrst, 'reload schema';
 
 
--- ===================== Mise à jour n°8 : rôles, annonces, avions =====================
+-- =====================================================================
+-- migration-08-roles-annonces.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°8 : trésorier (seul accès aux comptes du bar),
 --  secrétaire (administrateur complet), annonces du club.
 --  À exécuter une fois dans Supabase > SQL Editor > New query > Run.
 -- =====================================================================
+
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
 
 -- 1. Trésorier : seule la personne nommée voit les consommations de tous
 create or replace function public.is_treasurer()
@@ -1053,17 +1124,22 @@ alter table public.aircraft add column if not exists unavailable_reason text;
 grant update (available, unavailable_reason) on public.aircraft to authenticated;
 
 -- 5. Avions du club
+do $seed$ begin
+  if not public._seed_once('avions-08') then return; end if;
 insert into public.aircraft (registration, model, type, seats, available) values
   ('F-HVXD', 'WT9 Dynamic', 'WT9', 2, false),
   ('F-HUIT', 'PS28 Cruiser', 'PS28', 2, false),
   ('F-HUFA', 'B23', 'B23', 2, false)
 on conflict (registration) do update
   set model = excluded.model, type = excluded.type, seats = excluded.seats, active = true;
+end $seed$;
 
 notify pgrst, 'reload schema';
 
 
--- ===================== Mise à jour n°9 : responsable maintenance =====================
+-- =====================================================================
+-- migration-09-maintenance.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°9 : responsable maintenance.
 --  La flotte (ajout d'avion, disponibilité, types) est réservée aux
@@ -1130,7 +1206,10 @@ grant execute on function public.can_manage_fleet() to authenticated;
 
 notify pgrst, 'reload schema';
 
--- ===================== Mise à jour n°10 : documentation des avions =====================
+
+-- =====================================================================
+-- migration-10-documents-avions.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°10 : documentation des avions (onglet « Flotte »).
 --  Lecture : tous les membres validés.
@@ -1195,7 +1274,10 @@ end $$;
 
 notify pgrst, 'reload schema';
 
--- ===================== Mise à jour n°11 : événements =====================
+
+-- =====================================================================
+-- migration-11-evenements.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°11 : Événements
 --  Trois types : sortie avion (avec avions), activité (sans avion : moto,
@@ -1757,17 +1839,35 @@ revoke execute on function public._rebalance_outing(uuid) from public, anon, aut
 notify pgrst, 'reload schema';
 
 
--- ===================== Mise à jour n°12 : bar en sections =====================
+-- =====================================================================
+-- migration-12-bar-sections.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°12 : carte du bar en deux sections (Boissons / Snacks).
 --  Prix provisoires, modifiables par le trésorier (Mon compte → Trésorerie).
 --  À exécuter une fois dans Supabase > SQL Editor > New query > Run.
 -- =====================================================================
 
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
 alter table public.bar_products add column if not exists category text not null default 'boissons';
 alter table public.bar_products drop constraint if exists bar_products_category_check;
 alter table public.bar_products add constraint bar_products_category_check check (category in ('boissons', 'snacks'));
 
+do $seed$ begin
+  if not public._seed_once('bar-12') then return; end if;
 -- Carte : on ajoute ce qui manque (sans toucher aux prix déjà saisis)
 insert into public.bar_products (name, price_cents, position, category)
 select v.name, v.price, v.pos, v.cat
@@ -1789,9 +1889,14 @@ update public.bar_products set category = 'boissons', active = true
  where lower(name) in ('tourtel', 'panaché', 'desperados', 'brewdog ipa');
 -- Anciennes boissons retirées de la carte (l'historique des consommations est conservé)
 update public.bar_products set active = false where lower(name) in ('bière', 'coca', 'eau');
+end $seed$;
 
 notify pgrst, 'reload schema';
 
+
+-- =====================================================================
+-- migration-13-fonctions.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°13 : tout le monde est « Membre » ; Instructeur et
 --  Administrateur deviennent des fonctions, comme Trésorier, Secrétaire,
@@ -1877,6 +1982,10 @@ grant execute on function public.member_directory() to authenticated;
 
 notify pgrst, 'reload schema';
 
+
+-- =====================================================================
+-- migration-14-mail-evenements.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°14 : email à tous les membres quand un événement est
 --  publié (chacun peut se désabonner dans « Mon compte »).
@@ -1917,6 +2026,10 @@ grant execute on function public.set_event_notifications(boolean) to authenticat
 
 notify pgrst, 'reload schema';
 
+
+-- =====================================================================
+-- migration-15-droits-documents.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°15 : documents des avions (onglet Flotte) ajoutés ou
 --  modifiés par les administrateurs, membres du CA, instructeurs et
@@ -1958,6 +2071,10 @@ end $$;
 
 notify pgrst, 'reload schema';
 
+
+-- =====================================================================
+-- migration-16-securite-rgpd.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°16 : sécurité et RGPD
 --   1. Verrouillage : plus aucune suppression définitive de données du club
@@ -2288,6 +2405,10 @@ grant execute on function public.set_club_info(jsonb) to authenticated;
 
 notify pgrst, 'reload schema';
 
+
+-- =====================================================================
+-- migration-17-annonces-fonctions.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°17 : annonces publiées par toute personne ayant une
 --  fonction (admin, instructeur, CA, trésorier, secrétaire, resp.
@@ -2302,6 +2423,10 @@ create policy announcements_delete on public.announcements for delete to authent
 
 notify pgrst, 'reload schema';
 
+
+-- =====================================================================
+-- migration-18-documents-fonctions.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°18 : documents des avions ajoutés / modifiés par toute
 --  personne ayant une fonction (admin, instructeur, CA, trésorier,
@@ -2322,6 +2447,10 @@ grant execute on function public.can_manage_docs() to authenticated;
 
 notify pgrst, 'reload schema';
 
+
+-- =====================================================================
+-- migration-19-accueil-inside.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°19 : accueil façon « Inside AFPA »
 --   1. Indisponibilité d'un avion avec période (du … au …)
@@ -2329,6 +2458,20 @@ notify pgrst, 'reload schema';
 --   3. Chiffres de l'accueil (membres actifs) et « Équipage de l'année »
 --   4. Liens utiles (outils de vol, réseaux) modifiables par les admins
 -- =====================================================================
+
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
 
 -- 1. Période d'indisponibilité ----------------------------------------
 alter table public.aircraft add column if not exists unavailable_from date;
@@ -2362,6 +2505,8 @@ revoke execute on function public.set_aircraft_availability(uuid, boolean, text,
 grant execute on function public.set_aircraft_availability(uuid, boolean, text, date, date) to authenticated;
 
 -- 2. Flotte du club (n'ajoute que les avions absents, ne modifie rien d'existant)
+do $seed$ begin
+  if not public._seed_once('avions-19') then return; end if;
 insert into public.aircraft (registration, model, type, seats)
 select v.reg, v.model, v.type, v.seats
 from (values
@@ -2377,6 +2522,7 @@ from (values
   ('F-HXAF', 'Diamond DA40',  'DA40',  4)
 ) v(reg, model, type, seats)
 where not exists (select 1 from public.aircraft a where upper(a.registration) = v.reg);
+end $seed$;
 
 -- 3. Chiffres de l'accueil ---------------------------------------------
 alter table public.profiles add column if not exists show_in_bar_ranking boolean not null default true;
@@ -2458,6 +2604,8 @@ create policy club_links_update on public.club_links for update to authenticated
 drop policy if exists club_links_delete on public.club_links;
 create policy club_links_delete on public.club_links for delete to authenticated using (public.app_role() = 'admin');
 
+do $seed$ begin
+  if not public._seed_once('liens-19') then return; end if;
 insert into public.club_links (section, title, subtitle, url, icon, position)
 select v.section, v.title, v.subtitle, v.url, v.icon, v.pos
 from (values
@@ -2472,6 +2620,7 @@ from (values
   ('liens', 'Instagram', '@airfranceprovenceaviation', 'https://www.instagram.com/airfranceprovenceaviation', '📷', 3)
 ) v(section, title, subtitle, url, icon, pos)
 where not exists (select 1 from public.club_links l where l.title = v.title);
+end $seed$;
 
 -- Journal : les liens aussi sont tracés
 drop trigger if exists zz_audit on public.club_links;
@@ -2480,11 +2629,29 @@ create trigger zz_audit after insert or update or delete on public.club_links
 
 notify pgrst, 'reload schema';
 
+
+-- =====================================================================
+-- migration-20-masse-centrage.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°20 : masse et centrage par avion (d'après le manuel de vol
 --  et la dernière fiche de pesée). Lecture : tous les membres validés.
 --  Modification : administrateurs et responsables maintenance.
 -- =====================================================================
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
 create table if not exists public.aircraft_mb (
   aircraft_id     uuid primary key references public.aircraft (id) on delete cascade,
   serial          text,                               -- n° de série
@@ -2520,6 +2687,8 @@ create trigger zz_audit after insert or update on public.aircraft_mb
 -- Pré-remplissage F-HSAA (valeurs relevées dans l'outil Inside AFPA : masse et moment à vide,
 -- postes de chargement, MTOW). Le bras carburant et le domaine de centrage restent à saisir
 -- depuis le manuel de vol avant que le calcul soit disponible.
+do $seed$ begin
+  if not public._seed_once('centrage-20') then return; end if;
 insert into public.aircraft_mb (aircraft_id, serial, empty_mass, empty_moment, mtow, stations, source)
 select a.id, 'C0502', 393.5, 169.8, 600,
        '[{"label":"Pilote","arm":0.70,"max":115},{"label":"Passager","arm":0.70,"max":115},{"label":"Bagages coffre AR","arm":1.31,"max":18}]'::jsonb,
@@ -2527,9 +2696,14 @@ select a.id, 'C0502', 393.5, 169.8, 600,
 from public.aircraft a
 where a.registration = 'F-HSAA'
   and not exists (select 1 from public.aircraft_mb m where m.aircraft_id = a.id);
+end $seed$;
 
 notify pgrst, 'reload schema';
 
+
+-- =====================================================================
+-- migration-21-documents-masse-centrage.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°21
 --   1. Nouvelle catégorie de documents « Équipements & avionique »
@@ -2538,6 +2712,20 @@ notify pgrst, 'reload schema';
 --   3. Données de masse et centrage de la flotte, relevées dans les manuels
 --      de vol et les fiches de pesée fournis (Inside, export du 25/09/2026)
 -- =====================================================================
+
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
 
 -- 1. Catégorie « equipements »
 alter table public.aircraft_documents drop constraint if exists aircraft_documents_category_check;
@@ -2549,6 +2737,8 @@ alter table public.aircraft_mb add column if not exists mzfw numeric(7,2) check 
 
 -- 3. Données par avion. Ne remplace que des fiches jamais retouchées à la main
 --    (vides, pré-remplies depuis Inside, ou issues de ce même import).
+do $seed$ begin
+  if not public._seed_once('centrage-21') then return; end if;
 with src (reg, serial, empty_mass, empty_moment, mtow, mlw, mzfw, fuel_arm, fuel_capacity_l, stations, envelope, source) as (
   values
   -- PS-28 Cruiser : manuel de vol PS-POH-1-1-11 §2 et §6 ; domaine 420–525 mm (28–35 % MAC)
@@ -2614,15 +2804,36 @@ on conflict (aircraft_id) do update set
 where m.source is null
    or m.source like 'Repris de l''outil Inside%'
    or m.source like '%[import 2026-09-25]';
+end $seed$;
 
 notify pgrst, 'reload schema';
 
+
+-- =====================================================================
+-- migration-22-carte-bar.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°22 : carte du bar (prix de septembre 2026)
 --  Les produits existants sont renommés / mis à jour (l'historique des
 --  consommations garde le nom et le prix de l'époque). Les produits qui ne
 --  sont plus à la carte sont masqués, jamais supprimés.
 -- =====================================================================
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
+do $seed$ begin
+  if not public._seed_once('bar-22') then return; end if;
 with carte (name, aliases, price, pos, cat) as (values
   ('Tourtel',          array['tourtel'],                                150,  1, 'boissons'),
   ('Bud',              array['bud'],                                    200,  2, 'boissons'),
@@ -2667,15 +2878,34 @@ ins as (
 update public.bar_products p set active = false
  where p.active
    and p.id not in (select id from upd union all select id from ins);
+end $seed$;
 
 notify pgrst, 'reload schema';
 
+
+-- =====================================================================
+-- migration-23-bons-plans.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°23 : carte des « bons plans » sur les aérodromes
 --  (restaurants, avitaillement, hébergement, visites…). Chaque membre
 --  validé peut en ajouter ; l'auteur ou un administrateur peut le modifier
 --  ou le retirer (archivage : rien n'est effacé).
 -- =====================================================================
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
 create table if not exists public.airfield_tips (
   id            uuid primary key default gen_random_uuid(),
   icao          text not null check (icao ~ '^[A-Z]{2}[A-Z0-9]{2}$'),
@@ -2713,14 +2943,21 @@ create trigger zz_audit after insert or update on public.airfield_tips
   for each row execute function public._audit();
 
 -- Premier bon plan (repris d'Inside)
+do $seed$ begin
+  if not public._seed_once('bons-plans-23') then return; end if;
 insert into public.airfield_tips (icao, airfield_name, lat, lon, category, title, description, on_field, contact, created_by)
 select 'LFTF', 'Cuers-Pierrefeu', 43.2476, 6.1267, 'resto', 'Le Saint Tex',
        'Un restaurant sympathique sur l''AD avec une carte restreinte composée de plats traditionnels faits maison (tartare, pâtes carbonara, entrecôte-frites).',
        true, 'https://www.facebook.com/lesainttex/', null
 where not exists (select 1 from public.airfield_tips where icao = 'LFTF' and title = 'Le Saint Tex');
+end $seed$;
 
 notify pgrst, 'reload schema';
 
+
+-- =====================================================================
+-- migration-24-deplacer-equipage.sql
+-- =====================================================================
 -- =====================================================================
 --  Mise à jour n°24 : déplacer un membre d'équipage d'un avion à l'autre
 --  (glisser-déposer sur la page d'une sortie avion).
@@ -2836,8 +3073,9 @@ grant execute on function public.move_crew(uuid, text, uuid, text) to authentica
 
 notify pgrst, 'reload schema';
 
+
 -- =====================================================================
---  Mise à jour n°25 : instructeur référent pour les sorties proposées
+-- migration-25-instructeur-referent.sql
 -- =====================================================================
 -- =====================================================================
 --  Mise à jour n°25 : instructeur référent + alignement sur la base en service
@@ -3141,13 +3379,144 @@ notify pgrst, 'reload schema';
 
 
 -- =====================================================================
---  Mise à jour n°26 : données masse & centrage depuis les manuels de vol
+-- migration-25-shop.sql
+-- =====================================================================
+-- =====================================================================
+--  Mise à jour n°25 : Le Shop — articles, commandes
+--  À exécuter une fois dans Supabase > SQL Editor > New query > Run.
+-- =====================================================================
+
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
+-- Table des articles du shop
+create table if not exists public.shop_items (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  description text,
+  price_cents int not null default 0,   -- prix en centimes (0 = gratuit/sur devis)
+  category    text not null default 'vetement', -- vetement | accessoire
+  image_url   text,
+  sizes       text,                     -- 'XS,S,M,L,XL,XXL' séparés par virgule, ou null
+  colors      text,                     -- 'Blanc,Marine,Rouge' séparés par virgule, ou null
+  active      boolean not null default true,
+  position    int not null default 0,
+  created_at  timestamptz not null default now()
+);
+
+-- Table des commandes
+create table if not exists public.shop_orders (
+  id          uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references public.profiles(id) on delete cascade,
+  item_id     uuid not null references public.shop_items(id) on delete restrict,
+  quantity    int not null default 1,
+  size        text,
+  color       text,
+  note        text,
+  status      text not null default 'pending', -- pending | confirmed | ready | delivered | cancelled
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+-- RLS
+alter table public.shop_items enable row level security;
+alter table public.shop_orders enable row level security;
+
+-- shop_items : lisibles par tous les membres, modifiables par admin
+drop policy if exists "shop_items_read"   on public.shop_items;
+drop policy if exists "shop_items_write"  on public.shop_items;
+
+create policy "shop_items_read" on public.shop_items
+  for select using (public.is_approved());
+
+create policy "shop_items_write" on public.shop_items
+  for all using (
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- shop_orders : chaque membre voit ses commandes ; admin voit tout
+drop policy if exists "shop_orders_self"   on public.shop_orders;
+drop policy if exists "shop_orders_admin"  on public.shop_orders;
+drop policy if exists "shop_orders_insert" on public.shop_orders;
+
+create policy "shop_orders_insert" on public.shop_orders
+  for insert with check (user_id = auth.uid() and public.is_approved());
+
+create policy "shop_orders_self" on public.shop_orders
+  for select using (user_id = auth.uid());
+
+create policy "shop_orders_admin" on public.shop_orders
+  for all using (
+    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+  );
+
+-- Trigger updated_at
+create or replace function public.touch_shop_order()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin new.updated_at := now(); return new; end; $$;
+
+drop trigger if exists touch_shop_order on public.shop_orders;
+create trigger touch_shop_order
+  before update on public.shop_orders
+  for each row execute function public.touch_shop_order();
+
+-- Quelques articles d'exemple (à adapter / supprimer)
+-- (seulement si le catalogue est vide, pour pouvoir relancer ce fichier sans créer de doublons)
+do $seed$ begin
+  if not public._seed_once('shop-25') then return; end if;
+insert into public.shop_items (name, description, price_cents, category, sizes, colors, position)
+select * from (values
+  ('T-shirt club', 'T-shirt coton 100% aux couleurs du club, logo brodé au cœur', 2500, 'Vêtements', 'XS,S,M,L,XL,XXL', 'Blanc,Marine', 1),
+  ('Polaire softshell', 'Veste softshell légère avec logo club, idéale pour les briefings sur le tarmac', 5500, 'Vêtements', 'S,M,L,XL,XXL', 'Marine,Gris', 2),
+  ('Casquette brodée', 'Casquette ajustable avec logo club brodé', 2000, 'Accessoires', null, 'Marine,Blanc', 3),
+  ('Mug "Pilote"', 'Mug céramique 350 ml, motif avion et indicatif LFMA', 1200, 'Accessoires', null, 'Blanc', 4),
+  ('Sticker pack', 'Pack de 5 stickers vinyle : logo club, LFMA, avions de la flotte…', 500, 'Accessoires', null, null, 5)
+) as v(name, description, price_cents, category, sizes, colors, position)
+where not exists (select 1 from public.shop_items);
+end $seed$;
+
+-- Colonnes ajoutées depuis (nom et prix figés à la commande, débit de l'ardoise)
+alter table public.shop_orders
+  add column if not exists item_name       text,
+  add column if not exists price_cents     int,
+  add column if not exists ardoise_charged boolean not null default false;
+
+notify pgrst, 'reload schema';
+
+
+-- =====================================================================
+-- migration-26-aircraft-mb-data.sql
 -- =====================================================================
 -- =====================================================================
 --  Mise à jour n°26 : données masse & centrage depuis les manuels de vol
 --  et fiches de pesée de chaque appareil.
 --  « Base toi sur les manuels de vol de chaque avion, n'invente rien. »
 -- =====================================================================
+
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
 
 -- -------------------------------------------------------------------------
 -- PS-28 Cruiser × 5  (F-HNLR, F-HSAC, F-HUIT, F-HPSA, F-HSAA)
@@ -3166,6 +3535,8 @@ notify pgrst, 'reload schema';
 -- Domaine : rectangle 0.420–0.525 m × 400–600 kg
 -- -------------------------------------------------------------------------
 
+do $seed$ begin
+  if not public._seed_once('centrage-26') then return; end if;
 -- F-HNLR
 insert into public.aircraft_mb (
   aircraft_id, serial,
@@ -3655,112 +4026,13 @@ on conflict (aircraft_id) do update set
   envelope         = excluded.envelope,
   source           = excluded.source,
   updated_at       = now();
+end $seed$;
 
 notify pgrst, 'reload schema';
 
 
 -- =====================================================================
---  Mise à jour n°25 bis : shop
--- =====================================================================
--- =====================================================================
---  Mise à jour n°25 : Le Shop — articles, commandes
---  À exécuter une fois dans Supabase > SQL Editor > New query > Run.
--- =====================================================================
-
--- Table des articles du shop
-create table if not exists public.shop_items (
-  id          uuid primary key default gen_random_uuid(),
-  name        text not null,
-  description text,
-  price_cents int not null default 0,   -- prix en centimes (0 = gratuit/sur devis)
-  category    text not null default 'vetement', -- vetement | accessoire
-  image_url   text,
-  sizes       text,                     -- 'XS,S,M,L,XL,XXL' séparés par virgule, ou null
-  colors      text,                     -- 'Blanc,Marine,Rouge' séparés par virgule, ou null
-  active      boolean not null default true,
-  position    int not null default 0,
-  created_at  timestamptz not null default now()
-);
-
--- Table des commandes
-create table if not exists public.shop_orders (
-  id          uuid primary key default gen_random_uuid(),
-  user_id     uuid not null references public.profiles(id) on delete cascade,
-  item_id     uuid not null references public.shop_items(id) on delete restrict,
-  quantity    int not null default 1,
-  size        text,
-  color       text,
-  note        text,
-  status      text not null default 'pending', -- pending | confirmed | ready | delivered | cancelled
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now()
-);
-
--- RLS
-alter table public.shop_items enable row level security;
-alter table public.shop_orders enable row level security;
-
--- shop_items : lisibles par tous les membres, modifiables par admin
-drop policy if exists "shop_items_read"   on public.shop_items;
-drop policy if exists "shop_items_write"  on public.shop_items;
-
-create policy "shop_items_read" on public.shop_items
-  for select using (public.is_approved());
-
-create policy "shop_items_write" on public.shop_items
-  for all using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
-  );
-
--- shop_orders : chaque membre voit ses commandes ; admin voit tout
-drop policy if exists "shop_orders_self"   on public.shop_orders;
-drop policy if exists "shop_orders_admin"  on public.shop_orders;
-drop policy if exists "shop_orders_insert" on public.shop_orders;
-
-create policy "shop_orders_insert" on public.shop_orders
-  for insert with check (user_id = auth.uid() and public.is_approved());
-
-create policy "shop_orders_self" on public.shop_orders
-  for select using (user_id = auth.uid());
-
-create policy "shop_orders_admin" on public.shop_orders
-  for all using (
-    exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
-  );
-
--- Trigger updated_at
-create or replace function public.touch_shop_order()
-returns trigger language plpgsql security definer set search_path = '' as $$
-begin new.updated_at := now(); return new; end; $$;
-
-drop trigger if exists touch_shop_order on public.shop_orders;
-create trigger touch_shop_order
-  before update on public.shop_orders
-  for each row execute function public.touch_shop_order();
-
--- Quelques articles d'exemple (à adapter / supprimer)
--- (seulement si le catalogue est vide, pour pouvoir relancer ce fichier sans créer de doublons)
-insert into public.shop_items (name, description, price_cents, category, sizes, colors, position)
-select * from (values
-  ('T-shirt club', 'T-shirt coton 100% aux couleurs du club, logo brodé au cœur', 2500, 'Vêtements', 'XS,S,M,L,XL,XXL', 'Blanc,Marine', 1),
-  ('Polaire softshell', 'Veste softshell légère avec logo club, idéale pour les briefings sur le tarmac', 5500, 'Vêtements', 'S,M,L,XL,XXL', 'Marine,Gris', 2),
-  ('Casquette brodée', 'Casquette ajustable avec logo club brodé', 2000, 'Accessoires', null, 'Marine,Blanc', 3),
-  ('Mug "Pilote"', 'Mug céramique 350 ml, motif avion et indicatif LFMA', 1200, 'Accessoires', null, 'Blanc', 4),
-  ('Sticker pack', 'Pack de 5 stickers vinyle : logo club, LFMA, avions de la flotte…', 500, 'Accessoires', null, null, 5)
-) as v(name, description, price_cents, category, sizes, colors, position)
-where not exists (select 1 from public.shop_items);
-
--- Colonnes ajoutées depuis (nom et prix figés à la commande, débit de l'ardoise)
-alter table public.shop_orders
-  add column if not exists item_name       text,
-  add column if not exists price_cents     int,
-  add column if not exists ardoise_charged boolean not null default false;
-
-notify pgrst, 'reload schema';
-
-
--- =====================================================================
---  Mise à jour n°27 : Shareflight
+-- migration-27-shareflight.sql
 -- =====================================================================
 -- =====================================================================
 --  Mise à jour n°27 : Shareflight — covoiturage aérien entre membres
@@ -3878,7 +4150,7 @@ notify pgrst, 'reload schema';
 
 
 -- =====================================================================
---  Mise à jour n°28 : corrections avant la mise en service
+-- migration-28-lancement.sql
 -- =====================================================================
 -- =====================================================================
 --  Mise à jour n°28 : corrections avant la mise en service
@@ -4185,7 +4457,7 @@ select
 
 
 -- =====================================================================
---  Mise à jour n°29 : Espace pédagogique
+-- migration-29-espace-pedagogique.sql
 -- =====================================================================
 -- =====================================================================
 --  Mise à jour n°29 : Espace pédagogique
@@ -4633,7 +4905,7 @@ select
 
 
 -- =====================================================================
---  Mise à jour n°30 : sorties avion — lâchers et accompagnants
+-- migration-30-sorties-avion.sql
 -- =====================================================================
 -- =====================================================================
 --  Mise à jour n°30 : sorties avion — lâchers et accompagnants (+1)
@@ -5558,7 +5830,7 @@ select exists (select 1 from pg_proc where proname = '_can_fly_in')
 
 
 -- =====================================================================
---  Mise à jour n°31 : placement d'office par l'organisateur
+-- migration-31-placement-organisateur.sql
 -- =====================================================================
 -- =====================================================================
 --  Mise à jour n°31 : placement d'office par l'organisateur
@@ -5966,7 +6238,7 @@ select exists (select 1 from pg_proc where proname = 'place_waitlisted') as "MIS
 
 
 -- =====================================================================
---  Mise à jour n°32 : sécurisation et sauvegarde
+-- migration-32-securite-sauvegarde.sql
 -- =====================================================================
 -- =====================================================================
 --  Mise à jour n°32 : sécurisation et sauvegarde
@@ -6136,6 +6408,342 @@ notify pgrst, 'reload schema';
 select exists (select 1 from pg_proc where proname = 'admin_export') as "MISE A JOUR 32 OK";
 
 
+-- =====================================================================
+-- migration-33-fiabilite.sql
+-- =====================================================================
+-- =====================================================================
+--  Mise à jour n°33 : fiabilité avant la mise en service
+--  - Les données d'exemple (avions, masse et centrage, carte du bar, liens,
+--    bons plans, shop) ne sont posées qu'à la première installation :
+--    relancer « mise-a-jour-complete.sql » ne remet plus d'anciennes
+--    masses à vide, d'anciens prix ou des avions retirés.
+--  - Organisateurs (CA, trésorier, chef pilote…) : peuvent modifier leurs
+--    événements publiés et retirer un participant ; les propositions à
+--    valider ne s'affichent qu'à ceux qui peuvent les valider.
+--  - Quiz : le chef pilote et le responsable conformité gèrent les
+--    questions depuis l'Espace pédagogique.
+--  Peut être exécutée plusieurs fois sans risque.
+--  À exécuter dans Supabase > SQL Editor > New query > Run.
+-- =====================================================================
+
+-- 1. Données d'exemple déjà posées sur cette base --------------------------------
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
+insert into public._seeds (name)
+select unnest(array['bar-04', 'avions-08', 'bar-12', 'avions-19', 'liens-19', 'centrage-20', 'centrage-21',
+                    'bar-22', 'bons-plans-23', 'shop-25', 'centrage-26'])
+on conflict (name) do nothing;
+
+-- 2. Questions du quiz : gérées par le chef pilote / resp. conformité / admins -------
+grant select, insert, update on public.quiz_questions to authenticated;
+grant usage on sequence public.quiz_questions_id_seq to authenticated;
+drop policy if exists quiz_questions_teach_select on public.quiz_questions;
+create policy quiz_questions_teach_select on public.quiz_questions for select to authenticated
+  using (public.can_teach());
+drop policy if exists quiz_questions_teach_insert on public.quiz_questions;
+create policy quiz_questions_teach_insert on public.quiz_questions for insert to authenticated
+  with check (public.can_teach());
+drop policy if exists quiz_questions_teach_update on public.quiz_questions;
+create policy quiz_questions_teach_update on public.quiz_questions for update to authenticated
+  using (public.can_teach()) with check (public.can_teach());
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'quiz_questions_text_check') then
+    alter table public.quiz_questions add constraint quiz_questions_text_check check (
+      length(btrim(question)) between 1 and 500
+      and length(btrim(option_a)) between 1 and 300 and length(btrim(option_b)) between 1 and 300
+      and length(btrim(option_c)) between 1 and 300 and length(btrim(option_d)) between 1 and 300
+      and (explanation is null or length(explanation) <= 1500)) not valid;
+  end if;
+end $$;
+drop trigger if exists zz_audit on public.quiz_questions;
+create trigger zz_audit after insert or update on public.quiz_questions
+  for each row execute function public._audit();
+
+-- 3. Événements : droits des organisateurs ------------------------------------------
+CREATE OR REPLACE FUNCTION public.get_outing(p_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_uid   uuid := auth.uid();
+  v_staff boolean := public.is_staff();
+  v_row   public.outings;
+  v_org   public.profiles;
+  v_kind  text;
+  v_ac    jsonb;
+  v_wait  jsonb;
+  v_part  jsonb;
+  v_mine  jsonb;
+  v_org_w numeric;
+  v_guest jsonb;
+begin
+  select * into v_row from public.outings where id = p_id;
+  if not found then return null; end if;
+
+  v_kind := coalesce(v_row.kind, 'vol');
+
+  if v_row.approval <> 'approved' and v_row.status <> 'cancelled' then
+    if not (v_staff or v_row.instructor_id = v_uid) then return null; end if;
+  end if;
+  if v_row.status = 'cancelled' then
+    if not (v_staff or v_row.instructor_id = v_uid
+            or exists (select 1 from public.registrations where outing_id = p_id and user_id = v_uid)) then
+      return null;
+    end if;
+  end if;
+
+  select * into v_org from public.profiles where id = v_row.instructor_id;
+
+  if v_row.instructor_id = v_uid then
+    select weight_kg into v_org_w from public.pilot_weights where user_id = v_uid order by updated_at desc limit 1;
+  end if;
+
+  if v_kind = 'vol' then
+    select coalesce(jsonb_agg(ac_data order by ac_reg), '[]') into v_ac
+    from (
+      select
+        a.registration as ac_reg,
+        jsonb_build_object(
+          'id', a.id,
+          'registration', a.registration,
+          'model', a.model,
+          'type', a.type,
+          'seats', a.seats,
+          'instructor_onboard', v_row.instructor_aircraft_id = a.id,
+          'capacity', greatest(a.seats - case when v_row.instructor_aircraft_id = a.id then 1 else 0 end, 0),
+          'occupants', coalesce((
+            select jsonb_agg(jsonb_build_object(
+              'registration_id', r.id,
+              'user_id', r.user_id,
+              'full_name', coalesce(r.guest_name, p.full_name),
+              'avatar_url', case when r.guest_of is null then p.avatar_url end,
+              'is_guest', r.guest_of is not null,
+              'host_name', case when r.guest_of is not null then p.full_name end,
+              'released', r.guest_of is not null or public._is_instructor(r.user_id) or exists (
+                select 1 from public.pilot_types pt
+                 where pt.user_id = r.user_id and pt.aircraft_type = a.type
+              ),
+              'phone', case when r.guest_of is null and (v_staff or v_row.instructor_id = v_uid) then p.phone end,
+              'weight_kg', case when v_row.instructor_id = v_uid or r.user_id = v_uid
+                                then case when r.guest_of is null then pw.weight_kg else r.guest_weight_kg end end
+            ) order by r.created_at)
+            from public.registrations r
+            join public.profiles p on p.id = r.user_id
+            left join public.pilot_weights pw on pw.user_id = r.user_id
+              and pw.updated_at = (select max(updated_at) from public.pilot_weights where user_id = r.user_id)
+            where r.outing_id = p_id and r.status = 'confirmed' and r.aircraft_id = a.id
+          ), '[]')
+        ) as ac_data
+      from public.outing_aircraft oa
+      join public.aircraft a on a.id = oa.aircraft_id
+      where oa.outing_id = p_id
+    ) sub;
+  else
+    v_ac := '[]';
+  end if;
+
+  select coalesce(jsonb_agg(w order by w_created), '[]') into v_wait
+  from (
+    select jsonb_build_object(
+      'registration_id', r.id,
+      'user_id', r.user_id,
+      'full_name', coalesce(r.guest_name, p.full_name),
+      'avatar_url', case when r.guest_of is null then p.avatar_url end,
+      'is_guest', r.guest_of is not null,
+      'host_name', case when r.guest_of is not null then p.full_name end,
+      'released', false,
+      'phone', case when r.guest_of is null and (v_staff or v_row.instructor_id = v_uid) then p.phone end,
+      'weight_kg', case when v_row.instructor_id = v_uid or r.user_id = v_uid
+                        then case when r.guest_of is null then pw.weight_kg else r.guest_weight_kg end end,
+      'position', row_number() over (order by r.created_at)
+    ) as w,
+    r.created_at as w_created
+    from public.registrations r
+    join public.profiles p on p.id = r.user_id
+    left join public.pilot_weights pw on pw.user_id = r.user_id
+      and pw.updated_at = (select max(updated_at) from public.pilot_weights where user_id = r.user_id)
+    where r.outing_id = p_id and r.status = 'waitlist'
+  ) sub;
+
+  if v_kind <> 'vol' then
+    select coalesce(jsonb_agg(jsonb_build_object(
+      'registration_id', r.id,
+      'user_id', r.user_id,
+      'full_name', coalesce(r.guest_name, p.full_name),
+      'avatar_url', case when r.guest_of is null then p.avatar_url end,
+      'is_guest', r.guest_of is not null,
+      'host_name', case when r.guest_of is not null then p.full_name end,
+      'released', false,
+      'phone', case when r.guest_of is null and (v_staff or v_row.instructor_id = v_uid) then p.phone end
+    ) order by r.created_at), '[]') into v_part
+    from public.registrations r
+    join public.profiles p on p.id = r.user_id
+    where r.outing_id = p_id and r.status = 'confirmed';
+  else
+    v_part := '[]';
+  end if;
+
+  select jsonb_build_object('id', r.id, 'status', r.status, 'aircraft_id', r.aircraft_id) into v_mine
+  from public.registrations r
+  where r.outing_id = p_id and r.user_id = v_uid and r.guest_of is null and r.status <> 'cancelled'
+  limit 1;
+
+  select jsonb_build_object('id', g.id, 'name', g.guest_name, 'weight_kg', g.guest_weight_kg,
+                            'status', g.status, 'aircraft_id', g.aircraft_id) into v_guest
+  from public.registrations g
+  join public.registrations h on h.id = g.guest_of
+  where g.outing_id = p_id and h.user_id = v_uid and g.status <> 'cancelled'
+  limit 1;
+
+  return jsonb_build_object(
+    'id',                    v_row.id,
+    'title',                 v_row.title,
+    'destination',           v_row.destination,
+    'description',           v_row.description,
+    'meeting_point',         v_row.meeting_point,
+    'departure_at',          v_row.departure_at,
+    'return_at',             v_row.return_at,
+    'registration_deadline', v_row.registration_deadline,
+    'max_participants',      v_row.max_participants,
+    'kind',                  v_kind,
+    'status',                v_row.status,
+    'instructor_aircraft_id',v_row.instructor_aircraft_id,
+    'instructor', jsonb_build_object(
+      'id',          v_org.id,
+      'full_name',   v_org.full_name,
+      'phone',       case when v_staff or v_row.instructor_id = v_uid then v_org.phone end,
+      'avatar_url',  v_org.avatar_url
+    ),
+    'can_manage',            v_staff,
+    'is_organizer',          v_row.instructor_id = v_uid,
+    'organizer_weight_kg',   v_org_w,
+    'approval',              v_row.approval,
+    'rejection_reason',      v_row.rejection_reason,
+    'can_edit',              public.can_organize() or (v_row.instructor_id = v_uid and v_row.approval <> 'approved'),
+    'can_remove',            v_staff or public.can_organize() or v_row.instructor_id = v_uid,
+    'aircraft',              v_ac,
+    'waitlist',              v_wait,
+    'participants',          v_part,
+    'my_registration',       v_mine,
+    'my_guest',              v_guest,
+    'my_guest_count',        (select count(*) from public.registrations g
+                               join public.registrations h on h.id = g.guest_of
+                              where g.outing_id = p_id and h.user_id = v_uid and g.status <> 'cancelled'),
+    'guests_allowed',        coalesce(v_row.guests_allowed, false)
+  );
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.cancel_registration(p_registration uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_uid    uuid := auth.uid();
+  v_reg    public.registrations;
+  v_outing public.outings;
+begin
+  if v_uid is null then raise exception 'Vous devez être connecté.'; end if;
+
+  select * into v_reg from public.registrations where id = p_registration;
+  if not found then raise exception 'Inscription introuvable.'; end if;
+
+  -- verrouille la sortie pour sérialiser les modifications
+  select * into v_outing from public.outings where id = v_reg.outing_id for update;
+  select * into v_reg from public.registrations where id = p_registration;
+
+  if v_reg.user_id <> v_uid and not (public.is_staff() or public.can_organize() or v_outing.instructor_id = v_uid) then
+    raise exception 'Vous ne pouvez pas annuler l''inscription d''un autre membre.';
+  end if;
+  if v_reg.status = 'cancelled' then raise exception 'Inscription déjà annulée.'; end if;
+  if v_outing.departure_at <= now() and not public.is_staff() then
+    raise exception 'La sortie a déjà commencé : contactez l''instructeur.';
+  end if;
+
+  -- le membre et son accompagnant éventuel
+  update public.registrations
+     set status = 'cancelled', aircraft_id = null, cancelled_at = now()
+   where (id = p_registration or guest_of = p_registration) and status <> 'cancelled';
+
+  if v_outing.departure_at <= now() then
+    return jsonb_build_object('changes', '[]'::jsonb);
+  end if;
+  return jsonb_build_object('changes', public._rebalance_outing(v_outing.id));
+end;
+$function$;
+
+CREATE OR REPLACE FUNCTION public.list_outings(p_past boolean DEFAULT false)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO ''
+AS $function$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if not public.is_approved() then raise exception 'Votre compte n''est pas encore validé.'; end if;
+
+  return coalesce((
+    select jsonb_agg(row_to_json(t) order by
+             case when p_past then null else t.departure_at end asc,
+             case when p_past then t.departure_at end desc)
+    from (
+      select o.id, o.title, o.destination, o.departure_at, o.return_at,
+             o.registration_deadline, o.status,
+             ip.full_name as instructor_name,
+             (o.instructor_aircraft_id is not null) as instructor_flies,
+             case when coalesce(o.kind, 'vol') = 'vol' then
+             (select coalesce(sum(greatest(a.seats - case when a.id = o.instructor_aircraft_id then 1 else 0 end, 0)), 0)
+                from public.outing_aircraft oa join public.aircraft a on a.id = oa.aircraft_id
+               where oa.outing_id = o.id)
+             else o.max_participants end as total_capacity,
+             coalesce(o.kind, 'vol') as kind, o.max_participants, o.meeting_point,
+             (select count(*) from public.registrations r
+               where r.outing_id = o.id and r.status = 'confirmed') as confirmed_count,
+             (select count(*) from public.registrations r
+               where r.outing_id = o.id and r.status = 'waitlist') as waitlist_count,
+             (select string_agg(a.registration || ' (' || a.seats || 'pl.)', ', ' order by oa.position)
+                from public.outing_aircraft oa join public.aircraft a on a.id = oa.aircraft_id
+               where oa.outing_id = o.id) as aircraft_summary,
+             (select r.status from public.registrations r
+               where r.outing_id = o.id and r.user_id = v_uid and r.status <> 'cancelled'
+                 and r.guest_of is null) as my_status,
+             (o.instructor_id = v_uid) as i_am_instructor,
+             o.approval, o.rejection_reason
+      from public.outings o
+      join public.profiles ip on ip.id = o.instructor_id
+      where (o.approval = 'approved' or o.instructor_id = v_uid or public.is_staff())
+        and case when p_past
+                 then coalesce(o.return_at, o.departure_at) < now()
+                 else coalesce(o.return_at, o.departure_at) >= now() end
+      limit 200
+    ) t), '[]'::jsonb);
+end;
+$function$;
+
+revoke execute on function public.get_outing(uuid), public.cancel_registration(uuid), public.list_outings(boolean) from public, anon;
+grant execute on function public.get_outing(uuid), public.cancel_registration(uuid), public.list_outings(boolean) to authenticated;
+
+notify pgrst, 'reload schema';
+
+select exists (select 1 from public._seeds where name = 'centrage-26')
+   and exists (select 1 from pg_policies where policyname = 'quiz_questions_teach_update') as "MISE A JOUR 33 OK";
+
+
 -- ===================== Vérification finale =====================
 notify pgrst, 'reload schema';
 select
@@ -6169,6 +6777,8 @@ select
     and exists (select 1 from pg_proc where proname = 'set_guest_count')
     and exists (select 1 from pg_proc where proname = 'place_waitlisted')
     and exists (select 1 from pg_proc where proname = 'admin_export')
+    and to_regclass('public._seeds') is not null
+    and exists (select 1 from pg_policies where policyname = 'quiz_questions_teach_update')
   as "TOUT EST A JOUR",
   (select count(*) from public.profiles) as membres,
   (select string_agg(registration, ', ' order by registration) from public.aircraft) as avions,

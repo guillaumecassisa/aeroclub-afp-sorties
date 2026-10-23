@@ -315,7 +315,7 @@ function FieldTips({
                     ))}
                 </p>
               </div>
-              {(t.created_by === meId || admin) && (
+              {admin && (
                 <form action={archiveTip.bind(null, t.id, t.icao)} className="shrink-0">
                   <SubmitButton
                     pending="…"

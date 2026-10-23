@@ -52,7 +52,8 @@ export default async function Page({
   const deadlinePassed = !!o.registration_deadline && new Date(o.registration_deadline) < now;
   const approved = !o.approval || o.approval === "approved";
   const organizer = canOrganize(me) || !!o.is_organizer; // peut gérer les inscrits et les équipages
-  const staff = isStaff(me); // peut retirer un inscrit, valider une proposition
+  const staff = isStaff(me); // peut valider une proposition
+  const canRemove = o.can_remove ?? staff; // retirer un participant : instructeurs, organisateurs du club, organisateur de l'événement
   const mine = o.my_registration && (o.my_registration.status as string) !== "cancelled" ? o.my_registration : null;
 
   const occupants = isFlight ? o.aircraft.flatMap((a) => a.occupants) : (o.participants ?? []);
@@ -237,7 +238,7 @@ export default async function Page({
                       </li>
                     )}
                     {a.occupants.map((p) => (
-                      <PersonRow key={p.registration_id} p={p} outingId={id} canRemove={staff && !started}>
+                      <PersonRow key={p.registration_id} p={p} outingId={id} canRemove={canRemove && !started}>
                         {!p.released && a.type && <span className="pill bg-wait-soft text-wait">non lâché {a.type}</span>}
                         {organizer && !started && <MoveForm outingId={id} who={p.registration_id} from={a.id} o={o} />}
                       </PersonRow>
@@ -256,7 +257,7 @@ export default async function Page({
           {!isFlight && (
             <PeopleCard title={`Participants (${occupants.length})`} empty="Aucun inscrit pour l'instant.">
               {occupants.map((p) => (
-                <PersonRow key={p.registration_id} p={p} outingId={id} canRemove={staff && !started} />
+                <PersonRow key={p.registration_id} p={p} outingId={id} canRemove={canRemove && !started} />
               ))}
             </PeopleCard>
           )}
@@ -265,7 +266,7 @@ export default async function Page({
             <div className={board ? "md:hidden" : ""}>
             <PeopleCard title={`Liste d'attente (${o.waitlist.length})`}>
               {o.waitlist.map((p) => (
-                <PersonRow key={p.registration_id} p={p} outingId={id} canRemove={staff && !started}>
+                <PersonRow key={p.registration_id} p={p} outingId={id} canRemove={canRemove && !started}>
                   <span className="text-xs text-muted">n° {p.position}</span>
                   {organizer && isFlight && !started && !cancelled && (
                     <PlaceForm outingId={id} registrationId={p.registration_id} o={o} />
@@ -307,7 +308,7 @@ export default async function Page({
             aircraft={o.aircraft}
             waitlist={o.waitlist}
             organizer={{ name: o.instructor.full_name, avatar_url: o.instructor.avatar_url }}
-            canRemove={staff}
+            canRemove={canRemove}
           />
         </section>
       )}

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { requireMember, canOrganize } from "@/lib/auth";
+import { requireMember, canOrganize, isStaff } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { Banner, StatusPill } from "@/components/Banner";
 import { formatDate, formatTime, dayBadge } from "@/lib/dates";
@@ -49,7 +49,7 @@ export default async function Page({
       {toReview.length > 0 && (
         <section className="mb-8">
           <h2 className="mb-3 text-sm font-semibold tracking-wide text-muted uppercase">
-            {organizer ? "Propositions à valider" : "Mes propositions"}
+            {isStaff(me) ? "Propositions à valider" : "Mes propositions"}
           </h2>
           <div className="space-y-3">
             {toReview.map((o) => (

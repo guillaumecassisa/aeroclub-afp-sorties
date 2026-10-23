@@ -4,6 +4,20 @@
 --  À exécuter une fois dans Supabase > SQL Editor > New query > Run.
 -- =====================================================================
 
+-- Données d'exemple : posées une seule fois, à la première installation.
+-- Relancer ce fichier plus tard ne les recrée pas et ne touche pas aux données saisies sur le site.
+create table if not exists public._seeds (name text primary key, done_at timestamptz not null default now());
+alter table public._seeds enable row level security;
+revoke all on public._seeds from public, anon, authenticated;
+create or replace function public._seed_once(p_name text)
+returns boolean language plpgsql set search_path = '' as $fn$
+begin
+  insert into public._seeds (name) values (p_name) on conflict (name) do nothing;
+  return found;
+end;
+$fn$;
+revoke execute on function public._seed_once(text) from public, anon, authenticated;
+
 -- 1. Trésorier : seule la personne nommée voit les consommations de tous
 create or replace function public.is_treasurer()
 returns boolean
@@ -65,11 +79,14 @@ alter table public.aircraft add column if not exists unavailable_reason text;
 grant update (available, unavailable_reason) on public.aircraft to authenticated;
 
 -- 5. Avions du club
+do $seed$ begin
+  if not public._seed_once('avions-08') then return; end if;
 insert into public.aircraft (registration, model, type, seats, available) values
   ('F-HVXD', 'WT9 Dynamic', 'WT9', 2, false),
   ('F-HUIT', 'PS28 Cruiser', 'PS28', 2, false),
   ('F-HUFA', 'B23', 'B23', 2, false)
 on conflict (registration) do update
   set model = excluded.model, type = excluded.type, seats = excluded.seats, active = true;
+end $seed$;
 
 notify pgrst, 'reload schema';
