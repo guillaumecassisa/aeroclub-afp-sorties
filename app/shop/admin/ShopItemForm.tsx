@@ -15,6 +15,9 @@ type ShopItem = {
   colors: string | null;
   active: boolean;
   image_url: string | null;
+  cost_cents?: number | null;
+  track_stock?: boolean;
+  low_stock_alert?: number;
 };
 
 export function ShopItemForm({
@@ -177,6 +180,41 @@ export function ShopItemForm({
                 className="accent-navy-2 h-4 w-4"
               />
               <span>Article actif (visible dans le shop)</span>
+            </label>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Prix d&apos;achat unitaire (€)</label>
+            <input
+              name="cost"
+              type="number"
+              step="0.01"
+              min="0"
+              className="field"
+              defaultValue={item?.cost_cents != null ? (item.cost_cents / 100).toFixed(2) : ""}
+              placeholder="Facultatif, pour calculer la marge"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Alerte de stock bas à partir de</label>
+            <input
+              name="low_stock_alert"
+              type="number"
+              min="0"
+              max="1000"
+              className="field"
+              defaultValue={item?.low_stock_alert ?? 2}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="flex cursor-pointer items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="track_stock"
+                value="true"
+                defaultChecked={item?.track_stock ?? true}
+                className="h-4 w-4 accent-navy-2"
+              />
+              <span>Suivre le stock de cet article (sorties automatiques à chaque remise au membre)</span>
             </label>
           </div>
           <div className="sm:col-span-2">

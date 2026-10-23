@@ -74,18 +74,81 @@ export async function cancelOrder(orderId: string) {
 // ── Admin : mettre à jour le statut d'une commande ──────────────────────────
 // « delivered » débite l'ardoise du membre (une seule fois), dans la même opération.
 
-export async function updateOrderStatus(orderId: string, status: string) {
+export async function updateOrderStatus(orderId: string, status: string, formData?: FormData) {
   await requireAdmin();
   const supabase = await createClient();
+  const back = adminBack(formData, "commandes");
   const { data, error } = await supabase.rpc("set_shop_order_status", { p_id: orderId, p_status: status });
-  if (error) redirect(`/shop/admin?erreur=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`${back}&erreur=${encodeURIComponent(error.message)}`);
 
+  revalidateShop();
+  const charged = (data as { charged?: boolean } | null)?.charged;
+  const msg =
+    status === "delivered"
+      ? charged
+        ? "Commande remise : montant ajouté à l'ardoise du membre et sorti du stock."
+        : "Commande remise et sortie du stock."
+      : "Statut mis à jour.";
+  redirect(`${back}&ok=${encodeURIComponent(msg)}`);
+}
+
+/** Retour vers l'onglet d'origine de la gestion du shop (filtre de commandes conservé). */
+function adminBack(fd: FormData | undefined, tab: string) {
+  const ret = String(fd?.get("ret") ?? "");
+  return /^\/shop\/admin\?onglet=[a-z]+(&statut=[a-z]+)?$/.test(ret) ? ret : `/shop/admin?onglet=${tab}`;
+}
+
+function revalidateShop() {
   revalidatePath("/shop");
   revalidatePath("/shop/admin");
   revalidatePath("/bar");
   revalidatePath("/bar/tresorerie");
-  const charged = (data as { charged?: boolean } | null)?.charged;
-  redirect(`/shop/admin?ok=${encodeURIComponent(charged ? "Commande livrée : montant ajouté à l'ardoise du membre." : "Statut mis à jour.")}`);
+}
+
+const cents = (raw: FormDataEntryValue | null) => {
+  const v = String(raw ?? "").trim().replace(",", ".");
+  if (!v) return null;
+  const n = Math.round(parseFloat(v) * 100);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
+
+// ── Admin : stock ─────────────────────────────────────────────────────────────
+
+/** Réception de marchandise (quantité positive) ou correction (négative). */
+export async function stockAdd(formData: FormData) {
+  await requireAdmin();
+  const supabase = await createClient();
+  const qty = parseInt(String(formData.get("qty") ?? ""), 10);
+  if (!Number.isFinite(qty) || qty === 0) redirect("/shop/admin?onglet=stock&erreur=Indiquez+une+quantit%C3%A9");
+  const { error } = await supabase.rpc("shop_stock_add", {
+    p_item: String(formData.get("item_id") ?? ""),
+    p_size: String(formData.get("size") ?? ""),
+    p_color: String(formData.get("color") ?? ""),
+    p_qty: qty,
+    p_unit_cost_cents: cents(formData.get("cost")),
+    p_note: String(formData.get("note") ?? "").slice(0, 300) || null,
+  });
+  if (error) redirect(`/shop/admin?onglet=stock&erreur=${encodeURIComponent(error.message)}`);
+  revalidateShop();
+  redirect(`/shop/admin?onglet=stock&ok=${encodeURIComponent(qty > 0 ? `${qty} article(s) entré(s) en stock.` : "Stock corrigé.")}`);
+}
+
+/** Inventaire : fixe la quantité comptée. */
+export async function stockSet(formData: FormData) {
+  await requireAdmin();
+  const supabase = await createClient();
+  const qty = parseInt(String(formData.get("qty") ?? ""), 10);
+  if (!Number.isFinite(qty) || qty < 0) redirect("/shop/admin?onglet=stock&erreur=Quantit%C3%A9+invalide");
+  const { error } = await supabase.rpc("shop_stock_set", {
+    p_item: String(formData.get("item_id") ?? ""),
+    p_size: String(formData.get("size") ?? ""),
+    p_color: String(formData.get("color") ?? ""),
+    p_qty: qty,
+    p_note: null,
+  });
+  if (error) redirect(`/shop/admin?onglet=stock&erreur=${encodeURIComponent(error.message)}`);
+  revalidateShop();
+  redirect("/shop/admin?onglet=stock&ok=Inventaire+enregistr%C3%A9");
 }
 
 // ── Admin : créer/modifier un article ───────────────────────────────────────
@@ -97,16 +160,18 @@ export async function upsertItem(formData: FormData) {
   const id = (formData.get("id") as string) || undefined;
   const name = formData.get("name") as string;
   const description = (formData.get("description") as string) || null;
-  const price_str = (formData.get("price") as string).replace(",", ".");
-  const price_cents = Math.round(parseFloat(price_str || "0") * 100);
+  const price_cents = cents(formData.get("price")) ?? 0;
   const category = (formData.get("category") as string) || null;
   // sizes/colors stored as CSV string
   const sizes = (formData.get("sizes") as string) || null;
   const colors = (formData.get("colors") as string) || null;
   const image_url = (formData.get("image_url") as string) || null;
   const active = formData.get("active") === "true" || formData.get("active") === "on";
+  const cost_cents = cents(formData.get("cost"));
+  const track_stock = formData.get("track_stock") === "true" || formData.get("track_stock") === "on";
+  const low_stock_alert = Math.max(0, Math.min(1000, parseInt(String(formData.get("low_stock_alert") ?? "2"), 10) || 0));
 
-  if (!name) redirect("/shop/admin?erreur=Nom+requis");
+  if (!name) redirect("/shop/admin?onglet=catalogue&erreur=Nom+requis");
 
   const payload = {
     name,
@@ -117,16 +182,19 @@ export async function upsertItem(formData: FormData) {
     colors: colors?.trim() || null,
     image_url,
     active,
+    cost_cents,
+    track_stock,
+    low_stock_alert,
   };
 
   const { error } = id
     ? await supabase.from("shop_items").update(payload).eq("id", id)
     : await supabase.from("shop_items").insert(payload);
-  if (error) redirect(`/shop/admin?erreur=${encodeURIComponent(error.message)}`);
+  if (error) redirect(`/shop/admin?onglet=catalogue&erreur=${encodeURIComponent(error.message)}`);
 
   revalidatePath("/shop");
   revalidatePath("/shop/admin");
-  redirect("/shop/admin?ok=Article+enregistre");
+  redirect("/shop/admin?onglet=catalogue&ok=Article+enregistr%C3%A9");
 }
 
 // ── Admin : supprimer un article ─────────────────────────────────────────────
@@ -144,12 +212,12 @@ export async function deleteItem(itemId: string) {
     .limit(1);
 
   if (active && active.length > 0) {
-    redirect("/shop/admin?erreur=Cet+article+a+des+commandes+en+cours");
+    redirect("/shop/admin?onglet=catalogue&erreur=Cet+article+a+des+commandes+en+cours");
   }
 
   await supabase.from("shop_items").update({ active: false }).eq("id", itemId);
 
   revalidatePath("/shop");
   revalidatePath("/shop/admin");
-  redirect("/shop/admin?ok=Article+desactive");
+  redirect("/shop/admin?onglet=catalogue&ok=Article+d%C3%A9sactiv%C3%A9");
 }

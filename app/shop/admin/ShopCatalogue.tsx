@@ -16,6 +16,9 @@ type ShopItem = {
   colors: string | null;
   active: boolean;
   image_url: string | null;
+  cost_cents?: number | null;
+  track_stock?: boolean;
+  low_stock_alert?: number;
 };
 
 export function ShopCatalogue({ items }: { items: ShopItem[] }) {
@@ -81,7 +84,14 @@ export function ShopCatalogue({ items }: { items: ShopItem[] }) {
                                 </span>
                               )}
                             </p>
-                            <p className="text-sm font-bold text-navy-2">{euros(item.price_cents)}</p>
+                            <p className="text-sm font-bold text-navy-2">
+                              {euros(item.price_cents)}
+                              {item.cost_cents != null && (
+                                <span className="ml-2 text-xs font-normal text-muted">
+                                  achat {euros(item.cost_cents)} · marge {euros(item.price_cents - item.cost_cents)}
+                                </span>
+                              )}
+                            </p>
                             <p className="text-xs text-muted">
                               {[item.sizes && `Tailles : ${item.sizes}`, item.colors && `Couleurs : ${item.colors}`]
                                 .filter(Boolean)

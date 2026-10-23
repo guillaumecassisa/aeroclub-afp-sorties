@@ -35,6 +35,7 @@ select
     and exists (select 1 from pg_policies where policyname = 'quiz_questions_teach_update')
     and exists (select 1 from pg_proc where proname = 'quiz_today_set')
     and exists (select 1 from public._seeds where name = 'quiz-flotte-35')
+    and to_regclass('public.shop_stock') is not null
   as "TOUT EST A JOUR",
   (select count(*) from public.profiles) as membres,
   (select string_agg(registration, ', ' order by registration) from public.aircraft) as avions,

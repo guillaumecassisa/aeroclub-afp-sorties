@@ -20,6 +20,7 @@ type ShopItem = {
   colors: string | null;
   active: boolean;
   image_url: string | null;
+  track_stock?: boolean;
 };
 
 type ShopOrder = {
@@ -59,14 +60,19 @@ export default async function Page({
   const sp = await searchParams;
   const supabase = await createClient();
 
-  const [{ data: itemsRaw }, { data: ordersRaw }] = await Promise.all([
+  const [{ data: itemsRaw }, { data: ordersRaw }, { data: stockRaw }] = await Promise.all([
     supabase.from("shop_items").select("*").eq("active", true).order("category").order("name"),
     supabase
       .from("shop_orders")
       .select("*, item:item_id(name, price_cents)")
       .eq("user_id", me.id)
       .order("created_at", { ascending: false }),
+    supabase.from("shop_stock").select("item_id, quantity"),
   ]);
+  // Indication de disponibilité : quantité en stock par article (toutes tailles et couleurs)
+  const stockByItem = new Map<string, number>();
+  for (const s of (stockRaw ?? []) as { item_id: string; quantity: number }[])
+    stockByItem.set(s.item_id, (stockByItem.get(s.item_id) ?? 0) + Math.max(0, s.quantity));
 
   const items = (itemsRaw ?? []) as ShopItem[];
   const orders = (ordersRaw ?? []) as ShopOrder[];
@@ -114,7 +120,16 @@ export default async function Page({
                           {item.description && (
                             <p className="mt-1 text-sm text-muted">{item.description}</p>
                           )}
-                          <p className="mt-2 text-xl font-bold text-navy-2">{euros(item.price_cents)}</p>
+                          <div className="mt-2 flex items-center justify-between gap-2">
+                            <p className="text-xl font-bold text-navy-2">{euros(item.price_cents)}</p>
+                            {item.track_stock !== false && stockRaw && (
+                              (stockByItem.get(item.id) ?? 0) > 0 ? (
+                                <span className="pill bg-ok-soft text-ok">En stock</span>
+                              ) : (
+                                <span className="pill bg-paper text-muted">Sur commande</span>
+                              )
+                            )}
+                          </div>
 
                           <form action={placeOrder} className="mt-3 space-y-2">
                             <input type="hidden" name="item_id" value={item.id} />
