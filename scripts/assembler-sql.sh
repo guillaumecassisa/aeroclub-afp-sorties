@@ -44,6 +44,7 @@ migration-33-fiabilite.sql
 migration-34-quiz.sql
 migration-35-quiz-flotte.sql
 migration-36-shop-stock.sql
+migration-37-quiz-tirage-fige.sql
 "
 LAST=$(echo "$MIGRATIONS" | grep . | tail -1 | sed 's/migration-\([0-9]*\).*/\1/')
 
