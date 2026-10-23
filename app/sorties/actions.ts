@@ -14,7 +14,7 @@ import {
   notifyReview,
   notifySeatChanges,
 } from "@/lib/email";
-import type { FormState, OutingKind, SeatChange } from "@/lib/types";
+import type { FormState, OutingDetail, OutingKind, SeatChange } from "@/lib/types";
 
 /*
  * Toutes les écritures passent par les fonctions de la base (save_outing, register_for_outing,
@@ -150,11 +150,18 @@ export async function registerSelf(outingId: string) {
   const { data, error } = await supabase.rpc("register_for_outing", { p_outing: outingId });
   if (error) back(outingId, "erreur", error.message);
   const res = data as { status: string; waitlist_position: number | null };
+  if (res.status === "confirmed") back(outingId, "ok", "Vous êtes inscrit : votre place est confirmée.");
+
+  // En attente alors qu'il reste des sièges : aucun avion compatible avec ses lâchers
+  const { data: o } = await supabase.rpc("get_outing", { p_id: outingId });
+  const detail = o as OutingDetail | null;
+  const free = (detail?.aircraft ?? []).some((a) => a.occupants.length < a.capacity);
   back(
     outingId,
     "ok",
-    res.status === "confirmed"
-      ? "Vous êtes inscrit : votre place est confirmée."
+    free
+      ? `Vous êtes en liste d'attente (position ${res.waitlist_position}) : il reste des sièges, mais sur des avions où vous n'êtes pas lâché et sans instructeur à bord. ` +
+          "Vérifiez vos lâchers dans « Mon compte » ; vous serez placé automatiquement dès qu'un siège compatible se libère ou qu'un instructeur rejoint un avion."
       : `C'est complet : vous êtes en liste d'attente (position ${res.waitlist_position}). Vous serez prévenu par email si une place se libère.`,
   );
 }
