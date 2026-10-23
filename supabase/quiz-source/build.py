@@ -6,6 +6,9 @@ import glob, hashlib, os, re, sys, unicodedata, collections
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, 'migration-34-quiz.sql')
+# Second argument facultatif : sous-dossier d'une mise à jour complémentaire
+# (head.sql, seed.txt, tail.sql, q*.txt), dédoublonnée avec la banque principale.
+SUB = os.path.join(HERE, sys.argv[2]) if len(sys.argv) > 2 else None
 CATS = {'general', 'meteo', 'reglementation', 'navigation', 'mecanique', 'moteur', 'instruments', 'radio',
         'documents', 'aerodynamique', 'performances', 'culture', 'flotte', 'securite', 'sol', 'pilotage', 'lfma'}
 EXISTING = [l.strip() for l in open(os.path.join(HERE, 'existing.txt'), encoding='utf-8') if l.strip()]
@@ -21,7 +24,12 @@ def q(s):
     return "'" + s.replace("'", "''") + "'"
 
 rows, errors, seen = [], [], {norm(e): 'existant' for e in EXISTING}
-for f in sorted(glob.glob(os.path.join(HERE, 'q*.txt'))):
+if SUB:
+    for f in sorted(glob.glob(os.path.join(HERE, 'q*.txt'))):
+        for line in open(f, encoding='utf-8'):
+            if line.strip() and not line.startswith('#') and line.count('|') == 6:
+                seen[norm(line.split('|')[1])] = 'banque principale'
+for f in sorted(glob.glob(os.path.join(SUB or HERE, 'q*.txt'))):
     for n, line in enumerate(open(f, encoding='utf-8'), 1):
         line = line.strip()
         if not line or line.startswith('#'):
@@ -58,18 +66,25 @@ for i, (cat, question, good, wrong, expl) in enumerate(rows):
 if errors:
     print('\n'.join(errors)); sys.exit(1)
 
-head = open(os.path.join(HERE, 'head.sql'), encoding='utf-8').read()
-corr = open(os.path.join(HERE, 'corrections.sql'), encoding='utf-8').read()
+SRC = SUB or HERE
+head = open(os.path.join(SRC, 'head.sql'), encoding='utf-8').read()
+corr = open(os.path.join(SRC, 'corrections.sql'), encoding='utf-8').read() if os.path.exists(os.path.join(SRC, 'corrections.sql')) else ''
+seed = open(os.path.join(SRC, 'seed.txt')).read().strip() if os.path.exists(os.path.join(SRC, 'seed.txt')) else 'quiz-34'
+num = '2' if SUB else '3'
+tail = open(os.path.join(SRC, 'tail.sql'), encoding='utf-8').read() if os.path.exists(os.path.join(SRC, 'tail.sql')) else None
 with open(OUT, 'w', encoding='utf-8') as o:
     o.write(head + '\n' + corr + '\n')
-    o.write('-- 3. Banque de questions (posée une seule fois) ----------------------------------\n')
-    o.write("do $seed$ begin\n  if not public._seed_once('quiz-34') then return; end if;\n")
+    o.write('-- ' + num + '. Banque de questions (posée une seule fois) ----------------------------------\n')
+    o.write("do $seed$ begin\n  if not public._seed_once('" + seed + "') then return; end if;\n")
     o.write('  insert into public.quiz_questions (question, option_a, option_b, option_c, option_d, correct, explanation, category)\n')
     o.write('  select v.question, v.option_a, v.option_b, v.option_c, v.option_d, v.correct, v.explanation, v.category\n  from (values\n')
     o.write(',\n'.join(values))
     o.write('\n  ) as v(question, option_a, option_b, option_c, option_d, correct, explanation, category)\n')
     o.write('  where not exists (select 1 from public.quiz_questions x where lower(btrim(x.question)) = lower(btrim(v.question)));\nend $seed$;\n\n')
-    o.write("notify pgrst, 'reload schema';\n\n-- Vérification\nselect\n"
+    if tail is not None:
+        o.write(tail)
+    else:
+      o.write("notify pgrst, 'reload schema';\n\n-- Vérification\nselect\n"
             "  exists (select 1 from pg_proc where proname = 'quiz_today_set')\n"
             "  and exists (select 1 from pg_indexes where indexname = 'quiz_answers_user_day_question')\n"
             "  and (select count(*) from public.quiz_questions) >= 900 as \"MISE A JOUR 34 OK\",\n"
