@@ -1,0 +1,10 @@
+[Unit]
+Description=Vérifie toutes les 10 minutes s'il y a une nouvelle version du site
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

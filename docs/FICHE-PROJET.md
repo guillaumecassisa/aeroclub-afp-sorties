@@ -37,6 +37,7 @@ documents 14 Mo, photos de profil). Largement dans les offres gratuites (500 Mo 
 | `scripts/` | `assembler-sql.sh` (reconstruit les fichiers SQL complets), sauvegarde / restauration des fichiers |
 | `tests/` | Tests de la base (droits, inscriptions, placement, bar, shop, quiz…) : `sh tests/run.sh` sur un PostgreSQL local |
 | `.github/workflows/sauvegarde.yml` | Sauvegarde nocturne chiffrée |
+| `deploy/vps/` | Installation et mise à jour du site sur un serveur VPS (voir `HEBERGEMENT.md`) |
 | `docs/` | Ce dossier de documentation |
 
 ## Variables d'environnement (Vercel → Settings → Environment Variables)

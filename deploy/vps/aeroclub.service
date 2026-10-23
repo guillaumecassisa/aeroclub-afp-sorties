@@ -1,0 +1,31 @@
+[Unit]
+Description=Site de l'aéroclub (Next.js)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=aeroclub
+Group=aeroclub
+WorkingDirectory=/srv/aeroclub/current
+EnvironmentFile=/etc/aeroclub/aeroclub.env
+Environment=NODE_ENV=production
+Environment=NEXT_TELEMETRY_DISABLED=1
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -H 127.0.0.1 -p 3000
+Restart=always
+RestartSec=5
+
+# Durcissement : le site ne peut écrire que dans son propre dossier
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/aeroclub
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

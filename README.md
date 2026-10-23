@@ -57,6 +57,7 @@ Développeurs : après avoir ajouté ou modifié une migration, reconstruire les
 nocturne chiffrée (base + fichiers) par GitHub Actions, avec la procédure de restauration.
 **[docs/PLAN-DE-REPRISE.md](docs/PLAN-DE-REPRISE.md)** : que faire en cas de panne, de perte ou de fuite.
 **[docs/FICHE-PROJET.md](docs/FICHE-PROJET.md)** : services utilisés, organisation du code, variables, historique.
+**[docs/HEBERGEMENT.md](docs/HEBERGEMENT.md)** : mettre le site à l'adresse du club (Vercel + domaine OVH, ou serveur VPS avec `deploy/vps/`).
 
 ## Développement
 

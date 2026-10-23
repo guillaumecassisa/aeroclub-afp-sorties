@@ -1,0 +1,8 @@
+[Unit]
+Description=Publication automatique des nouveautés du site de l'aéroclub
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/aeroclub-mettre-a-jour
