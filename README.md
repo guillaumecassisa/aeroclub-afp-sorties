@@ -23,11 +23,13 @@ Technologies : Next.js 16 (Vercel) + Supabase (PostgreSQL, comptes, fichiers). O
 ## Rôles et fonctions
 
 - **En attente** : compte créé, pas encore validé par un administrateur.
-- **Membre** : s'inscrit aux événements, propose des événements (validés par le bureau), consomme au bar, commande au shop.
-- **Instructeur** : organise des sorties, est compté comme « instructeur à bord » (permet d'emmener un membre non lâché sur le type).
-- **Administrateur** : tout, dont la validation des comptes, les fonctions et la sauvegarde.
-- Fonctions cumulables : **trésorier** (bar, stats), **secrétaire** (documents), **maintenance** (flotte),
-  **bureau** (valide les propositions d'événements), **chef pilote** et **responsable conformité** (espace pédagogique, REX).
+- **Membre** : s'inscrit aux événements, propose des événements (validés par un instructeur ou un admin), consomme au bar, commande au shop.
+- **Instructeur** : organise des sorties, valide les propositions, compte comme « instructeur à bord » (permet d'emmener un membre non lâché sur le type).
+- **Administrateur** (et **secrétaire**, qui en a les droits) : validation des comptes, fonctions, gestion du shop, sauvegarde.
+- Fonctions cumulables : **trésorier** (bar de tous, stats), **resp. maintenance** (flotte, masse et centrage),
+  **chef pilote** et **responsable conformité** (espace pédagogique, REX, quiz). Toute fonction permet de publier des événements.
+
+Le détail action par action : **[docs/DROITS.md](docs/DROITS.md)**.
 
 Toutes les règles (places, liste d'attente, lâchers, droits) sont appliquées **dans la base de données**
 (règles RLS et fonctions sécurisées) : contourner le site ne permet pas de les enfreindre.
@@ -53,6 +55,8 @@ Développeurs : après avoir ajouté ou modifié une migration, reconstruire les
 
 **[docs/SAUVEGARDES.md](docs/SAUVEGARDES.md)** : téléchargement manuel depuis le site, et sauvegarde
 nocturne chiffrée (base + fichiers) par GitHub Actions, avec la procédure de restauration.
+**[docs/PLAN-DE-REPRISE.md](docs/PLAN-DE-REPRISE.md)** : que faire en cas de panne, de perte ou de fuite.
+**[docs/FICHE-PROJET.md](docs/FICHE-PROJET.md)** : services utilisés, organisation du code, variables, historique.
 
 ## Développement
 
@@ -73,5 +77,5 @@ lib/                       Accès aux données, droits (auth.ts), emails, mété
 public/outils/             Calculateur de performances
 scripts/                   Sauvegarde / restauration des fichiers, assemblage des fichiers SQL
 tests/                     Tests SQL
-docs/                      Installation d'un nouveau club, sauvegardes
+docs/                      Droits, nouveau club, sauvegardes, plan de reprise, fiche projet
 ```

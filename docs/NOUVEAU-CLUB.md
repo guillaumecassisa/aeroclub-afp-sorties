@@ -56,7 +56,7 @@ ou depuis le site lui-même.
    update public.profiles set role = 'admin' where email = 'votre@email.fr';
    ```
 3. Reconnectez-vous : **⚙️ Gestion → Membres et droits** permet ensuite de valider les comptes
-   et de donner les fonctions (instructeur, trésorier, secrétaire, maintenance, bureau,
+   et de donner les fonctions (instructeur, trésorier, secrétaire, maintenance,
    chef pilote, responsable conformité).
 
 ## 6. Sauvegardes
