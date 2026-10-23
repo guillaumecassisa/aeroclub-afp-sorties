@@ -63,14 +63,16 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
       </Section>
 
       <Section title="Mes coordonnées">
-        <ProfileForm me={me} />
+        <ProfileForm me={me} hasReleases={released.length > 0} />
       </Section>
 
       <Section
         title="Types d'avions sur lesquels je suis lâché"
-        subtitle="Cochez chaque type d'avion sur lequel vous êtes lâché. Les instructeurs s'en servent pour composer les équipages."
+        subtitle="Cochez chaque type d'avion sur lequel vous êtes lâché. Lors des sorties, vous n'êtes placé dans un avion que si vous êtes lâché sur son type ou si un instructeur est à bord."
       >
-        <ReleasesForm types={types} released={released} />
+        <div id="lachers" className="scroll-mt-24">
+          <ReleasesForm types={types} released={released} />
+        </div>
       </Section>
 
       <Section
