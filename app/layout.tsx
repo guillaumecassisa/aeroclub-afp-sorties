@@ -27,7 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="fr">
       <body className="font-sans antialiased">
         <header className="sticky top-0 z-10 bg-white print:hidden">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-2.5">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-2.5">
             {approved ? (
               <Link href="/" className="flex min-w-0 items-center gap-3">
                 <Image src="/logo.png" alt="" width={44} height={44} priority className="h-11 w-11 shrink-0" />
@@ -71,28 +71,28 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
           {approved && (
             <nav className="border-t border-line bg-white/60">
-              <div className="mx-auto flex max-w-[1500px] items-center gap-1 overflow-x-auto px-3 py-2">
-                <NavLink href="/" exact icon="🏠">Accueil</NavLink>
-                <NavLink href="/sorties" icon="📅">Événements</NavLink>
-                <NavLink href="/pedagogie" icon="🎓">Pédagogie</NavLink>
-                <NavLink href="/preparer-son-vol" icon="🗺️">Préparer son vol</NavLink>
-                <NavLink href="/flotte" icon="✈️">Flotte</NavLink>
-                <NavLink href="/bar" exact icon="🍺">Bar</NavLink>
-                <NavLink href="/shop" exact icon="🛍️">Le shop</NavLink>
+              <div className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-2 py-2">
+                <NavLink href="/" exact>Accueil</NavLink>
+                <NavLink href="/sorties">Événements</NavLink>
+                <NavLink href="/pedagogie">Pédagogie</NavLink>
+                <NavLink href="/preparer-son-vol">Préparer son vol</NavLink>
+                <NavLink href="/flotte">Flotte</NavLink>
+                <NavLink href="/bar" exact>Bar</NavLink>
+                <NavLink href="/shop" exact>Le shop</NavLink>
                 <span className="mx-1 h-6 w-px shrink-0 bg-line max-lg:hidden" aria-hidden />
                 <span className="ml-auto" aria-hidden />
-                <NavLink href="/annuaire" icon="👥">Annuaire</NavLink>
-                <NavLink href="/bons-plans" icon="💡">Bons plans</NavLink>
-                <NavLink href="/shareflight" icon="🛩️">Shareflight</NavLink>
-                {manages && <NavLink href="/gestion" icon="⚙️">Gestion</NavLink>}
+                <NavLink href="/annuaire">Annuaire</NavLink>
+                <NavLink href="/bons-plans">Bons plans</NavLink>
+                <NavLink href="/shareflight">Shareflight</NavLink>
+                {manages && <NavLink href="/gestion">Gestion</NavLink>}
               </div>
             </nav>
           )}
           <div className="af-stripe" />
         </header>
-        <main className="mx-auto max-w-5xl px-4 py-6 pb-10">{children}</main>
+        <main className="mx-auto max-w-6xl px-4 py-6 pb-10">{children}</main>
         <footer className="border-t border-line print:hidden">
-          <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-5 text-xs text-muted">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-5 text-xs text-muted">
             <span>© {new Date().getFullYear()} {CLUB_NAME}</span>
             <Link href="/mentions-legales" className="hover:text-navy-2 hover:underline">
               Mentions légales

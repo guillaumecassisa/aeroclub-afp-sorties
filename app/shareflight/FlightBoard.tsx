@@ -54,7 +54,7 @@ function PublishBanner({ onPublished, clubAircraft }: { onPublished?: () => void
     <div className="border-b border-line bg-white">
       {/* Barre de déclenchement */}
       {!open && (
-        <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-3">
+        <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
           <span className="text-sm text-muted">Vous partez en navigation et souhaitez emmener des passagers ?</span>
           <button type="button" onClick={() => setOpen(true)} className="btn-primary ml-auto shrink-0">
             ✈️ Proposer un vol
@@ -71,7 +71,7 @@ function PublishBanner({ onPublished, clubAircraft }: { onPublished?: () => void
             setDep("");
             setArr("");
           })}
-          className="mx-auto max-w-5xl px-4 py-4"
+          className="mx-auto max-w-6xl px-4 py-4"
         >
           <div className="flex flex-wrap items-end gap-3">
             {/* Départ */}
