@@ -152,6 +152,20 @@ export default async function Page({
         </div>
       )}
 
+      {/* Affiche : seulement si l'organisateur en a ajouté une */}
+      {o.poster_url && (
+        <a
+          href={o.poster_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="card mb-6 block overflow-hidden bg-paper"
+          title="Voir l'affiche en grand"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={o.poster_url} alt={`Affiche : ${o.title}`} className="mx-auto max-h-[480px] w-auto object-contain" />
+        </a>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           {/* Infos */}

@@ -98,6 +98,7 @@ export type Person = {
 export type OutingDetail = {
   id: string;
   title: string;
+  poster_url?: string | null; // affiche de l'événement (facultative)
   destination: string | null;
   description: string | null;
   meeting_point: string | null;

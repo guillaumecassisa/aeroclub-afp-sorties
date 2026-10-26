@@ -44,6 +44,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           max_participants: o.max_participants,
           guests_allowed: !!o.guests_allowed,
           registered_count: registered,
+          poster_url: o.poster_url ?? null,
         }}
         submitLabel="Enregistrer"
       />

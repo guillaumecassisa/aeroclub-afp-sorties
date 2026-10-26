@@ -72,6 +72,39 @@ async function announcePublished(outingId: string, dateFixed = false): Promise<s
   return emailConfigured() ? ` ${recipients.length} membre(s) prévenu(s) par email.` : "";
 }
 
+const POSTER_BUCKET = "documents";
+
+/** Dépose (ou retire, si file est null) l'affiche d'un événement ; renvoie un message d'erreur ou null. */
+async function savePoster(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  outingId: string,
+  file: File | null,
+): Promise<string | null> {
+  const folder = `events/${outingId}`;
+  let keep: string | null = null;
+  if (file) {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) return "le fichier doit être une image (JPEG, PNG ou WebP).";
+    if (file.size > 4 * 1024 * 1024) return "image trop lourde (4 Mo maximum).";
+    const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+    keep = `${folder}/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage
+      .from(POSTER_BUCKET)
+      .upload(keep, file, { contentType: file.type, cacheControl: "31536000", upsert: false });
+    if (upErr) return upErr.message;
+  }
+  const url = keep ? supabase.storage.from(POSTER_BUCKET).getPublicUrl(keep).data.publicUrl : null;
+  const { error } = await supabase.rpc("set_outing_poster", { p_outing: outingId, p_url: url });
+  if (error) {
+    if (keep) await supabase.storage.from(POSTER_BUCKET).remove([keep]);
+    return error.message;
+  }
+  // Ménage : les anciennes affiches de cet événement
+  const { data: old } = await supabase.storage.from(POSTER_BUCKET).list(folder);
+  const stale = (old ?? []).map((f) => `${folder}/${f.name}`).filter((p) => p !== keep);
+  if (stale.length) await supabase.storage.from(POSTER_BUCKET).remove(stale);
+  return null;
+}
+
 export async function saveOuting(_prev: FormState, formData: FormData): Promise<FormState> {
   const me = await requireMember();
 
@@ -136,6 +169,15 @@ export async function saveOuting(_prev: FormState, formData: FormData): Promise<
   if (gErr) return { error: gErr.message };
   await notifySeatChanges(((g as { changes?: SeatChange[] } | null)?.changes ?? []) as SeatChange[], info);
 
+  // Affiche de l'événement (photo déjà réduite par le navigateur)
+  const poster = formData.get("poster");
+  const posterErr =
+    poster instanceof File && poster.size > 0
+      ? await savePoster(supabase, res.outing_id, poster)
+      : formData.get("poster_remove") === "1"
+        ? await savePoster(supabase, res.outing_id, null)
+        : null;
+
   let msg: string;
   if (res.approval !== "approved") {
     await notifyNewProposal(res.notify_staff, info, me.full_name ?? "Un membre");
@@ -154,6 +196,7 @@ export async function saveOuting(_prev: FormState, formData: FormData): Promise<
         : "Projet créé (date à définir) : les membres peuvent déjà montrer leur intérêt.") +
       (await announcePublished(res.outing_id));
   }
+  if (posterErr) msg += ` Affiche non enregistrée : ${posterErr}`;
   const promoted = (res.changes ?? []).filter((c) => c.change === "promoted").length;
   const demoted = (res.changes ?? []).filter((c) => c.change === "demoted").length;
   if (promoted) msg += ` ${promoted} personne(s) sortie(s) de la liste d'attente.`;

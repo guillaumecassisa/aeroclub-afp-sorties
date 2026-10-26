@@ -38,6 +38,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Envois de photos (affiches d'événements, réduites dans le navigateur) : 5 Mo maximum
+  experimental: { serverActions: { bodySizeLimit: "5mb" } },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useMemo, useState } from "react";
+import { startTransition, useActionState, useEffect, useMemo, useState } from "react";
 import { saveOuting } from "@/app/sorties/actions";
-import { FormMessage, SubmitButton, keepValues } from "@/components/ui";
+import { FormMessage, SubmitButton } from "@/components/ui";
 import type { Aircraft, OutingKind } from "@/lib/types";
 
 export type OutingFormValues = {
@@ -21,7 +21,22 @@ export type OutingFormValues = {
   max_participants?: number | null;
   registered_count?: number;
   guests_allowed?: boolean;
+  poster_url?: string | null;
 };
+
+/** Réduit une photo dans le navigateur (1600 px max, JPEG) pour un envoi léger. */
+async function shrinkImage(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return await new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("conversion"))), "image/jpeg", 0.85),
+  );
+}
 
 const KINDS: { kind: OutingKind; label: string; hint: string; icon: string }[] = [
   { kind: "vol", label: "Sortie avion", hint: "Navigation, sortie club : on attribue des avions", icon: "✈️" },
@@ -45,6 +60,36 @@ export function OutingForm({
   const [flies, setFlies] = useState(!!initial.instructor_aircraft);
   const [myAircraft, setMyAircraft] = useState<string>(initial.instructor_aircraft ?? "");
   const [noDate, setNoDate] = useState(!initial.departure_at);
+  const [poster, setPoster] = useState<Blob | null>(null);
+  const [posterPreview, setPosterPreview] = useState<string | null>(initial.poster_url ?? null);
+  const [posterRemoved, setPosterRemoved] = useState(false);
+  const [posterError, setPosterError] = useState<string | null>(null);
+  useEffect(() => () => {
+    if (posterPreview?.startsWith("blob:")) URL.revokeObjectURL(posterPreview);
+  }, [posterPreview]);
+
+  const pickPoster = async (file: File | undefined) => {
+    setPosterError(null);
+    if (!file) return;
+    if (!file.type.startsWith("image/")) return setPosterError("Choisissez une image (JPEG, PNG…).");
+    try {
+      const blob = await shrinkImage(file);
+      setPoster(blob);
+      setPosterRemoved(false);
+      setPosterPreview(URL.createObjectURL(blob));
+    } catch {
+      setPosterError("Image illisible : essayez une photo en JPEG ou PNG.");
+    }
+  };
+
+  const submit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const fd = new FormData(e.currentTarget);
+    fd.delete("poster_pick");
+    if (poster) fd.set("poster", poster, "affiche.jpg");
+    else if (posterRemoved) fd.set("poster_remove", "1");
+    startTransition(() => action(fd));
+  };
 
   const isFlight = kind === "vol";
   const byId = useMemo(() => new Map(fleet.map((a) => [a.id, a])), [fleet]);
@@ -56,7 +101,7 @@ export function OutingForm({
     setSelected((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
 
   return (
-    <form onSubmit={keepValues(action)} className="space-y-6">
+    <form onSubmit={submit} className="space-y-6">
       {initial.id && <input type="hidden" name="id" value={initial.id} />}
       <input type="hidden" name="kind" value={kind} />
 
@@ -152,6 +197,44 @@ export function OutingForm({
           />
         </div>
 
+      </fieldset>
+
+      <fieldset className="card space-y-3 p-5">
+        <legend className="sr-only">Affiche</legend>
+        <div>
+          <h2 className="font-bold text-navy-2">Affiche de l&apos;événement</h2>
+          <p className="text-sm text-muted">Facultative : une photo ou une affiche, montrée en haut de la page de l&apos;événement.</p>
+        </div>
+        {posterPreview && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={posterPreview} alt="Affiche de l'événement" className="max-h-72 rounded-lg border border-line object-contain" />
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="btn-secondary cursor-pointer text-sm">
+            {posterPreview ? "Changer l'affiche" : "Ajouter une affiche"}
+            <input
+              type="file"
+              name="poster_pick"
+              accept="image/jpeg,image/png,image/webp"
+              className="sr-only"
+              onChange={(e) => pickPoster(e.target.files?.[0])}
+            />
+          </label>
+          {posterPreview && (
+            <button
+              type="button"
+              className="text-sm text-danger hover:underline"
+              onClick={() => {
+                setPoster(null);
+                setPosterPreview(null);
+                setPosterRemoved(!!initial.poster_url);
+              }}
+            >
+              Retirer l&apos;affiche
+            </button>
+          )}
+        </div>
+        {posterError && <p className="text-sm text-danger">{posterError}</p>}
       </fieldset>
 
       {isFlight ? (
