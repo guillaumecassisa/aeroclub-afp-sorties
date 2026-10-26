@@ -35,26 +35,43 @@ export async function cancelConsumption(id: string, returnTo: string) {
 
 // ---- Trésorier -------------------------------------------------------------
 
-export async function setPaid(userId: string, month: string, paid: boolean) {
+/** Retour vers un onglet de la trésorerie (adresse contrôlée). */
+function tresoBack(fd: FormData | undefined, fallback: string) {
+  const ret = String(fd?.get("ret") ?? "");
+  return /^\/bar\/tresorerie\?onglet=[a-z]+(&mois=\d{4}-\d{2})?$/.test(ret) ? ret : fallback;
+}
+
+export async function setPaid(userId: string, month: string, paid: boolean, formData?: FormData) {
   await requireTreasurer();
   const supabase = await createClient();
   const { error } = await supabase.rpc("set_bar_paid", { p_user: userId, p_month: `${month}-01`, p_paid: paid });
-  const path = `/bar/tresorerie?mois=${month}`;
+  const path = tresoBack(formData, `/bar/tresorerie?onglet=ardoises&mois=${month}`);
   if (error) back(path, "erreur", error.message);
   revalidatePath("/bar/tresorerie");
   redirect(path);
+}
+
+/** Retirer un produit de la carte, ou l'y remettre (l'historique des consommations est conservé). */
+export async function toggleProduct(id: string, active: boolean) {
+  await requireTreasurer();
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("bar_products").update({ active }).eq("id", id).select("name").maybeSingle();
+  const path = "/bar/tresorerie?onglet=carte";
+  if (error) back(path, "erreur", error.message);
+  back(path, "ok", `${data?.name ?? "Produit"} ${active ? "remis à la carte" : "retiré de la carte"}.`);
 }
 
 export async function saveProduct(id: string, _: FormState, formData: FormData): Promise<FormState> {
   if (!isTreasurer(await requireMember())) return { error: "Réservé au trésorier." };
   const name = String(formData.get("name") ?? "").trim();
   const price = parseEuros(String(formData.get("price") ?? ""));
-  const active = formData.get("active") === "on";
+  // « En vente » n'est modifié que s'il fait partie du formulaire (sinon : Retirer / Remettre)
+  const active = formData.has("active_field") ? formData.get("active") === "on" : undefined;
   const category = formData.get("category") === "snacks" ? "snacks" : "boissons";
   if (!name) return { error: "Nom obligatoire." };
   if (price === null) return { error: "Prix invalide." };
   const supabase = await createClient();
-  const { error } = await supabase.from("bar_products").update({ name, price_cents: price, active, category }).eq("id", id);
+  const { error } = await supabase.from("bar_products").update({ name, price_cents: price, category, ...(active === undefined ? {} : { active }) }).eq("id", id);
   if (error) return { error: error.message };
   revalidatePath("/bar");
   revalidatePath("/bar/tresorerie");

@@ -37,7 +37,7 @@ export default async function Page() {
     });
   }
   const money: Tile[] = [];
-  if (isTreasurer(me)) money.push({ href: "/bar/tresorerie", icon: "🧾", title: "Trésorerie du bar", text: "Ardoises du mois, encaissements, carte du bar." });
+  if (isTreasurer(me)) money.push({ href: "/bar/tresorerie", icon: "🍺", title: "Gestion du bar", text: "Tableau de bord, ardoises, relances, carte et prix, export Excel." });
   if (admin) money.push({ href: "/shop/admin", icon: "🛍️", title: "Shop (gestion)", text: "Articles, commandes, livraisons." });
   if (admin || isTreasurer(me)) money.push({ href: "/stats", icon: "📊", title: "Statistiques", text: "Chiffre d'affaires du bar et du shop." });
   if (money.length) tiles.push({ section: "Bar et shop", items: money });

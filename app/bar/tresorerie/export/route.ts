@@ -1,10 +1,34 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { getCurrentProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { currentMonthKey, isMonthKey } from "@/lib/money";
 import type { BarMonthSummary } from "@/lib/types";
+import { loadBarData } from "@/lib/bar";
+import { buildBarWorkbook } from "@/lib/barExport";
+import { period } from "@/lib/shopExport";
 
-// Export CSV (séparateur « ; » et BOM pour une ouverture directe dans Excel)
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+// ?format=xlsx : classeur Excel complet sur une période ; sinon CSV d'un mois (séparateur « ; », BOM pour Excel)
 export async function GET(request: NextRequest) {
+  if (request.nextUrl.searchParams.get("format") === "xlsx") {
+    const me = await getCurrentProfile();
+    if (!me || me.role === "pending" || !me.is_treasurer) return new NextResponse("Réservé au trésorier.", { status: 403 });
+    const supabase = await createClient();
+    const data = await loadBarData(supabase);
+    if (data.error) return new NextResponse(data.error, { status: 500 });
+    const p = period(request.nextUrl.searchParams, "Depuis l'ouverture du bar");
+    const buf = await buildBarWorkbook(data, p, currentMonthKey());
+    return new NextResponse(new Uint8Array(buf), {
+      headers: {
+        "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "content-disposition": `attachment; filename="bar-${p.slug}.xlsx"`,
+        "cache-control": "no-store",
+      },
+    });
+  }
+
   const param = request.nextUrl.searchParams.get("mois") ?? undefined;
   const month = isMonthKey(param) ? param : currentMonthKey();
   const supabase = await createClient();

@@ -1,5 +1,5 @@
 -- =====================================================================
---  MISE À JOUR COMPLÈTE (n°2 à n°42) d'une base existante.
+--  MISE À JOUR COMPLÈTE (n°2 à n°43) d'une base existante.
 --  Peut être relancée autant de fois que nécessaire : elle n'ajoute que ce qui
 --  manque et ne modifie aucune donnée saisie sur le site.
 --  Supabase > SQL Editor > New query > coller tout le fichier > Run.
@@ -9114,6 +9114,41 @@ select
   exists (select 1 from public._seeds where name = 'quiz-reglement-42') as "MISE A JOUR 42 OK";
 
 
+-- =====================================================================
+-- migration-43-bar-gestion.sql
+-- =====================================================================
+-- =====================================================================
+--  Mise à jour n°43 : nouvelle gestion du bar (tableau de bord, relances)
+--  Le trésorier obtient le nom et l'adresse email des membres qui ont une
+--  ardoise (y compris les anciens membres), pour les relances et l'export.
+--  Peut être exécutée plusieurs fois sans risque.
+--  À exécuter dans Supabase > SQL Editor > New query > Run.
+-- =====================================================================
+
+create or replace function public.bar_members()
+returns table (id uuid, full_name text, email text, avatar_url text)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+begin
+  if not public.is_treasurer() then
+    raise exception 'Réservé au trésorier.';
+  end if;
+  return query
+    select p.id, p.full_name, case when p.anonymized_at is null then p.email end, p.avatar_url
+      from public.profiles p
+     where exists (select 1 from public.bar_consumptions c where c.user_id = p.id);
+end;
+$$;
+revoke execute on function public.bar_members() from public, anon;
+grant execute on function public.bar_members() to authenticated;
+
+-- Vérification
+select 'MISE A JOUR 43 OK' as resultat;
+
+
 -- ===================== Vérification finale =====================
 notify pgrst, 'reload schema';
 select
@@ -9152,7 +9187,7 @@ select
     and exists (select 1 from pg_proc where proname = 'quiz_today_set')
     and exists (select 1 from public._seeds where name = 'quiz-flotte-35')
     and exists (select 1 from public._seeds where name = 'quiz-reglement-42')
-    and to_regclass('public.shop_stock') is not null and to_regclass('public.quiz_daily_set') is not null and exists (select 1 from pg_trigger where tgname = 'on_auth_user_deleted') and to_regclass('public.shop_settings') is not null and exists (select 1 from pg_proc where proname = 'set_outing_poster') and (select is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'outings' and column_name = 'departure_at') = 'YES'
+    and to_regclass('public.shop_stock') is not null and to_regclass('public.quiz_daily_set') is not null and exists (select 1 from pg_trigger where tgname = 'on_auth_user_deleted') and to_regclass('public.shop_settings') is not null and exists (select 1 from pg_proc where proname = 'set_outing_poster') and exists (select 1 from pg_proc where proname = 'bar_members') and (select is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'outings' and column_name = 'departure_at') = 'YES'
   as "TOUT EST A JOUR",
   (select count(*) from public.profiles) as membres,
   (select string_agg(registration, ', ' order by registration) from public.aircraft) as avions,

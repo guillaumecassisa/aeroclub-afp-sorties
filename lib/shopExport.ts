@@ -12,13 +12,13 @@ import {
   type StockMove,
 } from "@/lib/shop";
 
-const NAVY = "FF14315C";
-const MONEY = '#,##0.00 "€"';
+export const NAVY = "FF14315C";
+export const MONEY = '#,##0.00 "€"';
 const DATE = "dd/mm/yyyy";
 const DATETIME = "dd/mm/yyyy hh:mm";
 
 /** Composantes d'une date à l'heure de Paris. */
-function paris(iso: string) {
+export function paris(iso: string) {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat("en-CA", {
       timeZone: "Europe/Paris",
@@ -40,7 +40,7 @@ function paris(iso: string) {
 
 const isDay = (v: string | null) => !!v && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
-export function period(sp: URLSearchParams) {
+export function period(sp: URLSearchParams, depuis = "Depuis l'ouverture du shop") {
   const today = paris(new Date().toISOString());
   const y = +today.year;
   switch (sp.get("periode")) {
@@ -49,7 +49,7 @@ export function period(sp: URLSearchParams) {
     case "annee-precedente":
       return { from: `${y - 1}-01-01`, to: `${y - 1}-12-31`, label: `Année ${y - 1}`, slug: String(y - 1) };
     case "tout":
-      return { from: "2000-01-01", to: today.day, label: "Depuis l'ouverture du shop", slug: "complet" };
+      return { from: "2000-01-01", to: today.day, label: depuis, slug: "complet" };
     case "dates": {
       const du = sp.get("du"), au = sp.get("au");
       if (isDay(du) && isDay(au) && du! <= au!) return { from: du!, to: au!, label: `Du ${du} au ${au}`, slug: `${du}_${au}` };
@@ -60,7 +60,7 @@ export function period(sp: URLSearchParams) {
   }
 }
 
-function styleSheet(ws: ExcelJS.Worksheet, headerRow: number, widths: number[]) {
+export function styleSheet(ws: ExcelJS.Worksheet, headerRow: number, widths: number[]) {
   widths.forEach((w, i) => (ws.getColumn(i + 1).width = w));
   const row = ws.getRow(headerRow);
   row.font = { bold: true, color: { argb: "FFFFFFFF" } };
@@ -73,7 +73,7 @@ function styleSheet(ws: ExcelJS.Worksheet, headerRow: number, widths: number[]) 
   }
 }
 
-function totalRow(ws: ExcelJS.Worksheet, values: (string | number | null)[], moneyCols: number[] = []) {
+export function totalRow(ws: ExcelJS.Worksheet, values: (string | number | null)[], moneyCols: number[] = []) {
   const r = ws.addRow(values);
   r.font = { bold: true };
   r.border = { top: { style: "thin" } };
