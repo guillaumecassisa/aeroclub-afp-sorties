@@ -70,20 +70,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             )}
           </div>
           {approved && (
-            <nav className="border-t border-line">
-              <div className="mx-auto flex max-w-5xl gap-1 overflow-x-auto px-2 text-sm">
-                <NavLink href="/" exact>Accueil</NavLink>
-                <NavLink href="/sorties">Événements</NavLink>
-                <NavLink href="/pedagogie">Pédagogie</NavLink>
-                <NavLink href="/preparer-son-vol">Préparer son vol</NavLink>
-                <NavLink href="/flotte">Flotte</NavLink>
-                <NavLink href="/bar" exact>Bar</NavLink>
-                <NavLink href="/shop" exact>Le shop</NavLink>
+            <nav className="border-t border-line bg-white/60">
+              <div className="mx-auto flex max-w-[1500px] items-center gap-1 overflow-x-auto px-3 py-2">
+                <NavLink href="/" exact icon="🏠">Accueil</NavLink>
+                <NavLink href="/sorties" icon="📅">Événements</NavLink>
+                <NavLink href="/pedagogie" icon="🎓">Pédagogie</NavLink>
+                <NavLink href="/preparer-son-vol" icon="🗺️">Préparer son vol</NavLink>
+                <NavLink href="/flotte" icon="✈️">Flotte</NavLink>
+                <NavLink href="/bar" exact icon="🍺">Bar</NavLink>
+                <NavLink href="/shop" exact icon="🛍️">Le shop</NavLink>
+                <span className="mx-1 h-6 w-px shrink-0 bg-line max-lg:hidden" aria-hidden />
                 <span className="ml-auto" aria-hidden />
-                <NavLink href="/annuaire">Annuaire</NavLink>
-                <NavLink href="/bons-plans">Bons plans</NavLink>
-                <NavLink href="/shareflight">Shareflight</NavLink>
-                {manages && <NavLink href="/gestion">⚙️ Gestion</NavLink>}
+                <NavLink href="/annuaire" icon="👥">Annuaire</NavLink>
+                <NavLink href="/bons-plans" icon="💡">Bons plans</NavLink>
+                <NavLink href="/shareflight" icon="🛩️">Shareflight</NavLink>
+                {manages && <NavLink href="/gestion" icon="⚙️">Gestion</NavLink>}
               </div>
             </nav>
           )}

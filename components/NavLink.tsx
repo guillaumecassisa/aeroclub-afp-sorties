@@ -3,7 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export function NavLink({ href, exact, children }: { href: string; exact?: boolean; children: React.ReactNode }) {
+export function NavLink({
+  href,
+  exact,
+  icon,
+  children,
+}: {
+  href: string;
+  exact?: boolean;
+  icon?: string;
+  children: React.ReactNode;
+}) {
   const path = usePathname();
   const active =
     href === "/sorties"
@@ -14,12 +24,18 @@ export function NavLink({ href, exact, children }: { href: string; exact?: boole
   return (
     <Link
       href={href}
-      className={`relative shrink-0 px-3 py-2.5 font-medium transition-colors ${
+      aria-current={active ? "page" : undefined}
+      className={`group flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[15px] min-[1600px]:px-3.5 font-semibold whitespace-nowrap transition-all ${
         active
-          ? "text-navy-2 after:absolute after:inset-x-3 after:bottom-0 after:h-0.5 after:bg-red"
-          : "text-muted hover:text-navy-2"
+          ? "bg-navy-2 text-white shadow-sm"
+          : "text-navy-2/75 hover:-translate-y-px hover:bg-sky-soft hover:text-navy-2"
       }`}
     >
+      {icon && (
+        <span aria-hidden className={`hidden text-base leading-none transition-transform min-[1600px]:inline ${active ? "" : "group-hover:scale-110"}`}>
+          {icon}
+        </span>
+      )}
       {children}
     </Link>
   );
