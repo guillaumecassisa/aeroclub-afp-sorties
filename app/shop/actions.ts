@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireMember, requireAdmin } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { loadShopSettings } from "@/lib/shop";
 
 // ── Passer une commande ──────────────────────────────────────────────────────
 
@@ -18,6 +19,9 @@ export async function placeOrder(formData: FormData) {
   const note = (formData.get("note") as string) || null;
 
   if (!item_id) redirect("/shop?erreur=Article+manquant");
+  if ((await loadShopSettings(supabase)).coming_soon) {
+    redirect(`/shop?erreur=${encodeURIComponent("Le shop ouvre bientôt : les commandes ne sont pas encore possibles.")}`);
+  }
 
   const { data: items, error: ie } = await supabase
     .from("shop_items")
@@ -111,6 +115,25 @@ const cents = (raw: FormDataEntryValue | null) => {
   const n = Math.round(parseFloat(v) * 100);
   return Number.isFinite(n) && n >= 0 ? n : null;
 };
+
+// ── Admin : mode « Bientôt en ligne » ─────────────────────────────────────────
+
+export async function setComingSoon(on: boolean, formData: FormData) {
+  await requireAdmin();
+  const supabase = await createClient();
+  const message = String(formData.get("message") ?? "").trim().slice(0, 300) || null;
+  const { error } = await supabase.rpc("set_shop_coming_soon", { p_on: on, p_message: message });
+  const back = adminBack(formData, "tableau");
+  if (error) redirect(`${back}&erreur=${encodeURIComponent(error.message)}`);
+  revalidateShop();
+  redirect(
+    `${back}&ok=${encodeURIComponent(
+      on
+        ? "Filigrane « Bientôt en ligne » activé : les membres voient le catalogue mais ne peuvent plus commander."
+        : "Shop ouvert : les membres peuvent commander.",
+    )}`,
+  );
+}
 
 // ── Admin : stock ─────────────────────────────────────────────────────────────
 

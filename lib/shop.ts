@@ -106,6 +106,14 @@ export async function fetchAll<T>(
   return { rows, error: null };
 }
 
+export type ShopSettings = { coming_soon: boolean; message: string | null; updated_at?: string | null };
+
+/** Mode « Bientôt en ligne » (aucune commande possible) et son message. */
+export async function loadShopSettings(supabase: SupabaseClient): Promise<ShopSettings> {
+  const { data } = await supabase.from("shop_settings").select("coming_soon, message, updated_at").maybeSingle();
+  return { coming_soon: !!data?.coming_soon, message: (data?.message as string | null) ?? null, updated_at: data?.updated_at ?? null };
+}
+
 /** Données complètes du shop pour l'administration et l'export. */
 export async function loadShopData(supabase: SupabaseClient) {
   const [items, orders, stock] = await Promise.all([

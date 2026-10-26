@@ -5,6 +5,7 @@ import { Banner } from "@/components/Banner";
 import { SubmitButton } from "@/components/ui";
 import { euros } from "@/lib/money";
 import { formatShort } from "@/lib/dates";
+import { loadShopSettings } from "@/lib/shop";
 import { placeOrder, cancelOrder } from "./actions";
 
 export const metadata: Metadata = { title: "Le shop" };
@@ -60,7 +61,7 @@ export default async function Page({
   const sp = await searchParams;
   const supabase = await createClient();
 
-  const [{ data: itemsRaw }, { data: ordersRaw }, { data: stockRaw }] = await Promise.all([
+  const [{ data: itemsRaw }, { data: ordersRaw }, { data: stockRaw }, settings] = await Promise.all([
     supabase.from("shop_items").select("*").eq("active", true).order("category").order("name"),
     supabase
       .from("shop_orders")
@@ -68,7 +69,9 @@ export default async function Page({
       .eq("user_id", me.id)
       .order("created_at", { ascending: false }),
     supabase.from("shop_stock").select("item_id, quantity"),
+    loadShopSettings(supabase),
   ]);
+  const comingSoon = settings.coming_soon;
   // Indication de disponibilité : quantité en stock par article (toutes tailles et couleurs)
   const stockByItem = new Map<string, number>();
   for (const s of (stockRaw ?? []) as { item_id: string; quantity: number }[])
@@ -92,9 +95,20 @@ export default async function Page({
         </div>
       </div>
 
+      {comingSoon && (
+        <div className="card mb-5 border-l-4 border-l-wait bg-wait-soft p-4">
+          <p className="font-bold text-navy-2">🚧 Le shop sera bientôt en ligne</p>
+          <p className="text-sm text-ink">
+            {settings.message ?? "Découvrez déjà les articles : les commandes ouvriront très prochainement."}
+          </p>
+        </div>
+      )}
+
       {items.length === 0 ? (
         <div className="card p-8 text-center text-muted">Le catalogue est vide pour le moment.</div>
       ) : (
+        <div className="relative">
+        {comingSoon && <ComingSoonWatermark />}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => {
                     const sizeOptions = item.sizes
@@ -131,6 +145,11 @@ export default async function Page({
                             )}
                           </div>
 
+                          {comingSoon ? (
+                            <p className="mt-3 rounded-lg bg-paper px-3 py-2 text-center text-sm font-semibold text-muted">
+                              Bientôt disponible
+                            </p>
+                          ) : (
                           <form action={placeOrder} className="mt-3 space-y-2">
                             <input type="hidden" name="item_id" value={item.id} />
                             {sizeOptions.length > 0 && (
@@ -171,10 +190,12 @@ export default async function Page({
                               Commander
                             </SubmitButton>
                           </form>
+                          )}
                         </div>
                       </div>
                     );
           })}
+        </div>
         </div>
       )}
 
@@ -246,5 +267,25 @@ export default async function Page({
         </section>
       )}
     </>
+  );
+}
+
+/** Filigrane diagonal répété par-dessus le catalogue (ne bloque pas le défilement). */
+function ComingSoonWatermark() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-xl">
+      <div className="absolute -inset-1/2 flex -rotate-[24deg] flex-col items-center justify-center gap-24">
+        {Array.from({ length: 14 }, (_, i) => (
+          <p
+            key={i}
+            className={`whitespace-nowrap text-5xl font-black tracking-[0.3em] text-navy-2/15 uppercase select-none sm:text-6xl ${
+              i % 2 ? "translate-x-40" : ""
+            }`}
+          >
+            Bientôt en ligne · Bientôt en ligne · Bientôt en ligne
+          </p>
+        ))}
+      </div>
+    </div>
   );
 }

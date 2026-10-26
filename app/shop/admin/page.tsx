@@ -13,15 +13,17 @@ import {
   ORDER_STATUS,
   itemVariants,
   loadShopData,
+  loadShopSettings,
   parisYearMonth,
   saleDate,
   variantKey,
   variantLabel,
   type ShopItem,
   type ShopOrder,
+  type ShopSettings,
   type StockMove,
 } from "@/lib/shop";
-import { stockAdd, stockSet, updateOrderStatus } from "../actions";
+import { setComingSoon, stockAdd, stockSet, updateOrderStatus } from "../actions";
 import { ShopCatalogue } from "./ShopCatalogue";
 
 export const metadata: Metadata = { title: "Gestion du shop" };
@@ -40,7 +42,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
   await requireAdmin();
   const sp = await searchParams;
   const supabase = await createClient();
-  const data = await loadShopData(supabase);
+  const [data, settings] = await Promise.all([loadShopData(supabase), loadShopSettings(supabase)]);
   const tab = TABS.find((t) => t.key === sp.onglet)?.key ?? "tableau";
   const activeCount = data.orders.filter((o) => (ACTIVE_STATUSES as readonly string[]).includes(o.status)).length;
 
@@ -55,6 +57,8 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
         </div>
         <Link href="/shop" className="btn-secondary text-sm">Voir le shop côté membre</Link>
       </div>
+
+      <ComingSoonCard settings={settings} ret={`/shop/admin?onglet=${tab}`} />
 
       <nav className="mb-6 flex flex-wrap gap-2" aria-label="Sections">
         {TABS.map((t) => (
@@ -601,5 +605,45 @@ async function Stock({ data }: { data: Data }) {
         )}
       </section>
     </div>
+  );
+}
+
+/** Filigrane « Bientôt en ligne » : visible sur tous les onglets, un seul bouton. */
+function ComingSoonCard({ settings, ret }: { settings: ShopSettings; ret: string }) {
+  const on = settings.coming_soon;
+  return (
+    <section
+      className={`card mb-5 flex flex-wrap items-center gap-3 border-l-4 p-4 ${on ? "border-l-wait bg-wait-soft" : "border-l-ok"}`}
+    >
+      <div className="min-w-0 flex-1">
+        <p className="font-bold text-navy-2">
+          {on ? "🚧 Filigrane « Bientôt en ligne » actif" : "✅ Shop ouvert aux commandes"}
+        </p>
+        <p className="text-sm text-muted">
+          {on
+            ? "Les membres voient le catalogue avec le filigrane, mais aucune commande n'est possible."
+            : "Activez le filigrane pour présenter le catalogue sans permettre d'acheter (préparation, rupture, inventaire…)."}
+        </p>
+      </div>
+      <form action={setComingSoon.bind(null, !on)} className="flex flex-wrap items-center gap-2">
+        <input type="hidden" name="ret" value={ret} />
+        {!on && (
+          <input
+            name="message"
+            className="field w-64! py-1.5 text-sm"
+            maxLength={300}
+            defaultValue={settings.message ?? ""}
+            placeholder="Message aux membres (facultatif)"
+          />
+        )}
+        <SubmitButton
+          className={on ? "btn-primary text-sm" : "btn-secondary text-sm"}
+          pending="…"
+          confirm={on ? "Ouvrir le shop aux commandes ?" : "Activer le filigrane « Bientôt en ligne » ? Les commandes seront bloquées."}
+        >
+          {on ? "Ouvrir le shop" : "Activer « Bientôt en ligne »"}
+        </SubmitButton>
+      </form>
+    </section>
   );
 }
