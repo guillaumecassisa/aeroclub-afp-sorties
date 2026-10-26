@@ -324,7 +324,7 @@ export default async function Page({
             </ul>
           )}
           <div className="border-t border-line px-4 py-2 text-right">
-            <Link href="/quiz" className="text-xs font-medium text-sky-600 hover:underline">Mes résultats →</Link>
+            <Link href="/compte#quiz" className="text-xs font-medium text-sky-600 hover:underline">Mes résultats →</Link>
           </div>
         </div>
         </div>

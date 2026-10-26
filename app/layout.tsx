@@ -83,7 +83,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <NavLink href="/annuaire">Annuaire</NavLink>
                 <NavLink href="/bons-plans">Bons plans</NavLink>
                 <NavLink href="/shareflight">Shareflight</NavLink>
-                <NavLink href="/quiz">Quiz</NavLink>
                 {manages && <NavLink href="/gestion">⚙️ Gestion</NavLink>}
               </div>
             </nav>

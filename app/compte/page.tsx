@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { isTreasurer, requireMember } from "@/lib/auth";
+import { QuizResults } from "@/components/QuizResults";
 import { currentMonthKey, euros, monthLabel } from "@/lib/money";
 import { createClient } from "@/lib/supabase/server";
 import { ROLE_LABELS, type Aircraft } from "@/lib/types";
@@ -182,6 +183,15 @@ export default async function Page({ searchParams }: { searchParams: Promise<Rec
         <p className="mt-2 text-xs text-muted">
           Vous ne voyez que vos propres consommations. Seul le trésorier du club a accès aux comptes de tous les membres.
         </p>
+      </Section>
+
+      <Section
+        title="✈️ Questions du jour : mes résultats"
+        subtitle="Chaque jour, 3 questions (QCM) pour réviser. Le top 5 des meilleurs scores est affiché sur l'accueil."
+      >
+        <div id="quiz" className="scroll-mt-24">
+          <QuizResults meId={me.id} />
+        </div>
       </Section>
 
       <Link href="/compte/mot-de-passe" className="btn-secondary">

@@ -12,7 +12,7 @@ export async function submitQuizAnswer(questionId: number, answer: string): Prom
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("quiz_answer", { p_question: questionId, p_answer: answer });
   if (error) return { correct: false, answer: "", explanation: null, error: error.message };
-  revalidatePath("/quiz");
+  revalidatePath("/compte");
   revalidatePath("/");
   return data as QuizResult;
 }
