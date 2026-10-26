@@ -81,3 +81,9 @@ Secrets GitHub (sauvegarde nocturne uniquement, jamais dans Vercel) : `SUPABASE_
 | 36 | Shop : stock, prix d'achat, date de vente, tableau de bord |
 | 37 | Quiz : tirage du jour figé, 3 réponses maximum par jour |
 | 38 | Événements : projets sans date |
+| 39 | Comptes : suppression de l'identifiant de connexion (fiche anonymisée, historique conservé) |
+| 40 | Shop : mode « Bientôt disponible » (commandes bloquées) |
+| 41 | Événements : affiche (photo) |
+| 42 | Quiz : questions sur le règlement intérieur de l'AFPA |
+| 43 | Bar : gestion (noms et emails des membres ayant une ardoise, pour les relances) |
+| 44 | Shareflight : photos de vol |

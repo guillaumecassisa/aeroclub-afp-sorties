@@ -56,6 +56,7 @@ instructeur ou un admin. Une fois publiée, il en devient l'**organisateur** et 
 | Inscrire un autre membre | — | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Répartir les équipages, placer la liste d'attente dans un avion | le sien | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Autoriser ou non les +1, retirer un participant | le sien | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Ajouter, changer ou retirer l'affiche d'un événement | le sien | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Voir le téléphone des inscrits | le sien | ✓ | — | — | — | ✓ |
 
 Sortie avion : un membre non lâché sur le type d'avion n'y est placé que si un instructeur est à bord.
@@ -70,7 +71,7 @@ Sortie avion : un membre non lâché sur le type d'avion n'y est placé que si u
 | Voir tous les REX déposés, les analyser, les publier | — | — | — | — | ✓ | ✓ |
 | Proposer une séance de formation | ✓ | — | — | — | — | — |
 | Programmer une formation directement | — | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Répondre aux 3 questions du jour, voir le classement | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Répondre aux 3 questions du jour, voir ses résultats (Mon compte) et le top 5 | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Ajouter, modifier, désactiver, supprimer des questions du quiz | — | — | — | — | ✓ | ✓ |
 
 ## Flotte et préparation des vols
@@ -93,11 +94,12 @@ attribuer la fonction Trésorier. La gestion du shop est réservée aux admins.
 | Noter ses consommations, voir son ardoise | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Annuler sa consommation | 30 min | 30 min | ✓ (mois non réglé) | 30 min | 30 min | 30 min |
 | Noter une consommation pour un autre membre | — | — | ✓ | — | — | — |
-| Voir le bar de tous, marquer un mois réglé, gérer les boissons et les prix | — | — | ✓ | — | — | — |
+| Gestion du bar : tableau de bord, ardoises, relances, carte et prix, export Excel | — | — | ✓ | — | — | — |
 | Statistiques (chiffre d'affaires) | — | — | ✓ | — | — | ✓ |
 | Commander au shop, voir ses commandes | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Annuler sa commande tant qu'elle est en attente | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Gestion du shop : commandes, stock, catalogue, export Excel | — | — | — | — | — | ✓ |
+| Activer / désactiver « Bientôt disponible » sur le shop | — | — | — | — | — | ✓ |
 
 ## Annonces, bons plans et partage de vols
 
@@ -109,6 +111,8 @@ attribuer la fonction Trésorier. La gestion du shop est réservée aux admins.
 | Archiver un bon plan | — | — | — | — | — | ✓ |
 | Partage de vols : publier un vol, rejoindre, se retirer | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Clore ou annuler un vol partagé | le sien | le sien | le sien | le sien | le sien | ✓ |
+| Partager des photos de vol, voir la galerie | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Supprimer une photo de vol | les siennes | les siennes | les siennes | les siennes | les siennes | ✓ |
 
 > Où c'est appliqué : `lib/auth.ts` (affichage) et, dans la base, les fonctions `is_approved`,
 > `is_staff`, `can_organize`, `can_teach`, `can_manage_fleet`, `can_manage_docs`, `is_treasurer`
