@@ -71,7 +71,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           </div>
           {approved && (
             <nav className="border-t border-line bg-white/60">
-              <div className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-2 py-2">
+              <div className="mx-auto flex max-w-6xl items-center gap-1 overflow-x-auto px-2 py-2 lg:justify-between">
                 <NavLink href="/" exact>Accueil</NavLink>
                 <NavLink href="/sorties">Événements</NavLink>
                 <NavLink href="/pedagogie">Pédagogie</NavLink>
@@ -79,8 +79,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 <NavLink href="/flotte">Flotte</NavLink>
                 <NavLink href="/bar" exact>Bar</NavLink>
                 <NavLink href="/shop" exact>Le shop</NavLink>
-                <span className="mx-1 h-6 w-px shrink-0 bg-line max-lg:hidden" aria-hidden />
-                <span className="ml-auto" aria-hidden />
                 <NavLink href="/annuaire">Annuaire</NavLink>
                 <NavLink href="/bons-plans">Bons plans</NavLink>
                 <NavLink href="/shareflight">Shareflight</NavLink>
