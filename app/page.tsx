@@ -337,7 +337,8 @@ export default async function Page({
           <span className="text-xs font-semibold tracking-widest text-muted uppercase">Espace Club</span>
           <div className="h-px flex-1 bg-line" />
         </div>
-        <div className="flex flex-wrap justify-center gap-4">
+        {/* Mobile : icônes à la suite ; ordinateur : grille de 4 par ligne */}
+        <div className="flex flex-wrap justify-center gap-4 lg:mx-auto lg:grid lg:max-w-4xl lg:grid-cols-4 lg:justify-items-center lg:gap-x-8 lg:gap-y-6">
           {[
             { href: "/bar", icon: "🍺", label: "Espace Bar", sub: "Consommations & solde" },
             { href: "/sorties", icon: "📅", label: "Événements", sub: "Sorties, activités & inscriptions" },
@@ -351,7 +352,7 @@ export default async function Page({
             <Link
               key={item.href}
               href={item.href}
-              className="group flex w-32 flex-col items-center gap-2 rounded-2xl p-4 text-center transition hover:bg-sky-soft"
+              className="group flex w-32 flex-col items-center gap-2 rounded-2xl p-4 text-center transition hover:bg-sky-soft lg:w-44"
             >
               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-sky-soft text-3xl shadow-sm transition group-hover:bg-white group-hover:shadow-md">
                 {item.icon}
