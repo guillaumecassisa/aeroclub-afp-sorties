@@ -9526,9 +9526,9 @@ select 'MISE A JOUR 39 OK' as resultat,
 -- migration-40-shop-bientot.sql
 -- =====================================================================
 -- =====================================================================
---  Mise à jour n°40 : mode « Bientôt en ligne » du shop
+--  Mise à jour n°40 : mode « Bientôt disponible » du shop
 --  Un administrateur peut l'activer depuis la gestion du shop : la page « Le shop »
---  affiche alors un filigrane « Bientôt en ligne » et plus aucune commande n'est
+--  affiche alors un filigrane « Bientôt disponible » et plus aucune commande n'est
 --  possible (refusée par la base, pas seulement masquée sur la page).
 --  Les commandes déjà passées restent visibles et gérées normalement.
 --  Peut être exécutée plusieurs fois sans risque.
@@ -9550,7 +9550,7 @@ grant select on public.shop_settings to authenticated;
 drop policy if exists shop_settings_read on public.shop_settings;
 create policy shop_settings_read on public.shop_settings for select to authenticated using (public.is_approved());
 
--- Le shop est-il en « Bientôt en ligne » ?
+-- Le shop est-il en « Bientôt disponible » ?
 create or replace function public.shop_coming_soon()
 returns boolean
 language sql

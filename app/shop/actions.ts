@@ -116,7 +116,7 @@ const cents = (raw: FormDataEntryValue | null) => {
   return Number.isFinite(n) && n >= 0 ? n : null;
 };
 
-// ── Admin : mode « Bientôt en ligne » ─────────────────────────────────────────
+// ── Admin : mode « Bientôt disponible » ─────────────────────────────────────────
 
 export async function setComingSoon(on: boolean, formData: FormData) {
   await requireAdmin();
@@ -129,7 +129,7 @@ export async function setComingSoon(on: boolean, formData: FormData) {
   redirect(
     `${back}&ok=${encodeURIComponent(
       on
-        ? "Filigrane « Bientôt en ligne » activé : les membres voient le catalogue mais ne peuvent plus commander."
+        ? "Filigrane « Bientôt disponible » activé : les membres voient le catalogue mais ne peuvent plus commander."
         : "Shop ouvert : les membres peuvent commander.",
     )}`,
   );

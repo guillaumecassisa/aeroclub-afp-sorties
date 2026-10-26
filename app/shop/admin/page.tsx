@@ -608,7 +608,7 @@ async function Stock({ data }: { data: Data }) {
   );
 }
 
-/** Filigrane « Bientôt en ligne » : visible sur tous les onglets, un seul bouton. */
+/** Filigrane « Bientôt disponible » : visible sur tous les onglets, un seul bouton. */
 function ComingSoonCard({ settings, ret }: { settings: ShopSettings; ret: string }) {
   const on = settings.coming_soon;
   return (
@@ -617,7 +617,7 @@ function ComingSoonCard({ settings, ret }: { settings: ShopSettings; ret: string
     >
       <div className="min-w-0 flex-1">
         <p className="font-bold text-navy-2">
-          {on ? "🚧 Filigrane « Bientôt en ligne » actif" : "✅ Shop ouvert aux commandes"}
+          {on ? "🚧 Filigrane « Bientôt disponible » actif" : "✅ Shop ouvert aux commandes"}
         </p>
         <p className="text-sm text-muted">
           {on
@@ -639,9 +639,9 @@ function ComingSoonCard({ settings, ret }: { settings: ShopSettings; ret: string
         <SubmitButton
           className={on ? "btn-primary text-sm" : "btn-secondary text-sm"}
           pending="…"
-          confirm={on ? "Ouvrir le shop aux commandes ?" : "Activer le filigrane « Bientôt en ligne » ? Les commandes seront bloquées."}
+          confirm={on ? "Ouvrir le shop aux commandes ?" : "Activer le filigrane « Bientôt disponible » ? Les commandes seront bloquées."}
         >
-          {on ? "Ouvrir le shop" : "Activer « Bientôt en ligne »"}
+          {on ? "Ouvrir le shop" : "Activer « Bientôt disponible »"}
         </SubmitButton>
       </form>
     </section>

@@ -97,7 +97,7 @@ export default async function Page({
 
       {comingSoon && (
         <div className="card mb-5 border-l-4 border-l-wait bg-wait-soft p-4">
-          <p className="font-bold text-navy-2">🚧 Le shop sera bientôt en ligne</p>
+          <p className="font-bold text-navy-2">🚧 Le shop sera bientôt disponible</p>
           <p className="text-sm text-ink">
             {settings.message ?? "Découvrez déjà les articles : les commandes ouvriront très prochainement."}
           </p>
@@ -282,7 +282,7 @@ function ComingSoonWatermark() {
               i % 2 ? "translate-x-40" : ""
             }`}
           >
-            Bientôt en ligne · Bientôt en ligne · Bientôt en ligne
+            Bientôt disponible · Bientôt disponible · Bientôt disponible
           </p>
         ))}
       </div>

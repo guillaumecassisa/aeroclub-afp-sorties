@@ -108,7 +108,7 @@ export async function fetchAll<T>(
 
 export type ShopSettings = { coming_soon: boolean; message: string | null; updated_at?: string | null };
 
-/** Mode « Bientôt en ligne » (aucune commande possible) et son message. */
+/** Mode « Bientôt disponible » (aucune commande possible) et son message. */
 export async function loadShopSettings(supabase: SupabaseClient): Promise<ShopSettings> {
   const { data } = await supabase.from("shop_settings").select("coming_soon, message, updated_at").maybeSingle();
   return { coming_soon: !!data?.coming_soon, message: (data?.message as string | null) ?? null, updated_at: data?.updated_at ?? null };
