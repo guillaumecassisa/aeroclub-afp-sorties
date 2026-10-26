@@ -99,7 +99,7 @@ export default async function Page({
         <div className="card mb-5 border-l-4 border-l-wait bg-wait-soft p-4">
           <p className="font-bold text-navy-2">🚧 Le shop sera bientôt disponible</p>
           <p className="text-sm text-ink">
-            {settings.message ?? "Découvrez déjà les articles : les commandes ouvriront très prochainement."}
+            Découvrez déjà les articles : les commandes ouvriront prochainement.
           </p>
         </div>
       )}
@@ -107,8 +107,6 @@ export default async function Page({
       {items.length === 0 ? (
         <div className="card p-8 text-center text-muted">Le catalogue est vide pour le moment.</div>
       ) : (
-        <div className="relative">
-        {comingSoon && <ComingSoonWatermark />}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => {
                     const sizeOptions = item.sizes
@@ -118,7 +116,8 @@ export default async function Page({
                       ? item.colors.split(",").map((c) => c.trim()).filter(Boolean)
                       : [];
                     return (
-                      <div key={item.id} className="card overflow-hidden">
+                      <div key={item.id} className="card relative overflow-hidden">
+                        {comingSoon && <ComingSoonRibbon />}
                         {item.image_url && (
                           <div className="aspect-video bg-paper">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -196,7 +195,6 @@ export default async function Page({
                     );
           })}
         </div>
-        </div>
       )}
 
       {/* Mes commandes actives */}
@@ -270,22 +268,13 @@ export default async function Page({
   );
 }
 
-/** Filigrane diagonal répété par-dessus le catalogue (ne bloque pas le défilement). */
-function ComingSoonWatermark() {
+/** Bandeau en coin « Bientôt disponible » : laisse l'article et sa photo entièrement visibles. */
+function ComingSoonRibbon() {
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 z-10 overflow-hidden rounded-xl">
-      <div className="absolute -inset-1/2 flex -rotate-[24deg] flex-col items-center justify-center gap-24">
-        {Array.from({ length: 14 }, (_, i) => (
-          <p
-            key={i}
-            className={`whitespace-nowrap text-5xl font-black tracking-[0.3em] text-navy-2/15 uppercase select-none sm:text-6xl ${
-              i % 2 ? "translate-x-40" : ""
-            }`}
-          >
-            Bientôt disponible · Bientôt disponible · Bientôt disponible
-          </p>
-        ))}
-      </div>
+    <div aria-hidden className="pointer-events-none absolute top-0 right-0 z-10 h-36 w-36 overflow-hidden">
+      <span className="absolute top-[38px] -right-[52px] w-[210px] rotate-45 bg-navy-2/90 py-1 text-center text-[11px] font-bold tracking-wide text-white uppercase shadow-md">
+        Bientôt disponible
+      </span>
     </div>
   );
 }

@@ -9528,7 +9528,7 @@ select 'MISE A JOUR 39 OK' as resultat,
 -- =====================================================================
 --  Mise à jour n°40 : mode « Bientôt disponible » du shop
 --  Un administrateur peut l'activer depuis la gestion du shop : la page « Le shop »
---  affiche alors un filigrane « Bientôt disponible » et plus aucune commande n'est
+--  affiche alors les articles marqués « Bientôt disponible » et plus aucune commande n'est
 --  possible (refusée par la base, pas seulement masquée sur la page).
 --  Les commandes déjà passées restent visibles et gérées normalement.
 --  Peut être exécutée plusieurs fois sans risque.

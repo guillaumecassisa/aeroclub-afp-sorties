@@ -621,21 +621,12 @@ function ComingSoonCard({ settings, ret }: { settings: ShopSettings; ret: string
         </p>
         <p className="text-sm text-muted">
           {on
-            ? "Les membres voient le catalogue avec le filigrane, mais aucune commande n'est possible."
+            ? "Les membres voient les articles et leurs photos, marqués « Bientôt disponible », mais aucune commande n'est possible."
             : "Activez le filigrane pour présenter le catalogue sans permettre d'acheter (préparation, rupture, inventaire…)."}
         </p>
       </div>
       <form action={setComingSoon.bind(null, !on)} className="flex flex-wrap items-center gap-2">
         <input type="hidden" name="ret" value={ret} />
-        {!on && (
-          <input
-            name="message"
-            className="field w-64! py-1.5 text-sm"
-            maxLength={300}
-            defaultValue={settings.message ?? ""}
-            placeholder="Message aux membres (facultatif)"
-          />
-        )}
         <SubmitButton
           className={on ? "btn-primary text-sm" : "btn-secondary text-sm"}
           pending="…"
