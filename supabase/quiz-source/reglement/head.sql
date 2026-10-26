@@ -1,0 +1,10 @@
+-- =====================================================================
+--  Mise à jour n°42 : 50 questions sur le règlement intérieur de l'AFPA
+--  Catégorie « Général » du quiz, tirées du règlement intérieur du club
+--  (mise à jour décembre 2025) : organisation, responsabilités, conditions
+--  pour voler, réservations, formalités avant et après le vol, paiement,
+--  activités particulières, image, vidéosurveillance.
+--  Le chef pilote peut ensuite les modifier, les retirer ou les supprimer.
+--  Peut être exécutée plusieurs fois sans risque.
+--  À exécuter dans Supabase > SQL Editor > New query > Run.
+-- =====================================================================

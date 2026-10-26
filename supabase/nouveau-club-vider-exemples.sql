@@ -1,7 +1,7 @@
 -- =====================================================================
 --  NOUVEAU CLUB : retire les données d'exemple reprises de l'AFPA
 --  (avions et masse & centrage, carte du bar, liens utiles, bons plans,
---  articles du shop, questions du quiz sur LFMA). À exécuter UNE FOIS, juste après
+--  articles du shop, questions du quiz sur LFMA, la flotte et le règlement intérieur de l'AFPA). À exécuter UNE FOIS, juste après
 --  installation-complete.sql, sur une base neuve.
 --  Ensuite : ajoutez vos avions dans « Flotte (maintenance) », votre carte
 --  dans « Bar → Trésorerie », vos liens dans « Liens utiles »…
@@ -20,9 +20,10 @@ delete from public.bar_products;
 delete from public.club_links;
 delete from public.airfield_tips;
 delete from public.shop_items;
--- Questions du quiz propres à l'AFPA (terrain LFMA et avions de la flotte) : à réécrire pour votre club
+-- Questions du quiz propres à l'AFPA (terrain LFMA, avions de la flotte, règlement intérieur) : à réécrire pour votre club
 delete from public.quiz_questions q
- where q.category in ('lfma', 'flotte') and not exists (select 1 from public.quiz_answers a where a.question_id = q.id);
+ where (q.category in ('lfma', 'flotte') or q.explanation like '%(Règlement intérieur AFPA%')
+   and not exists (select 1 from public.quiz_answers a where a.question_id = q.id);
 update public.club_info set association_name = 'Mon aéroclub', address = null, registration_number = null,
   publication_director = null, contact_email = null, contact_phone = null, updated_at = now()
  where id = 1;

@@ -49,6 +49,7 @@ migration-38-projets-sans-date.sql
 migration-39-suppression-compte.sql
 migration-40-shop-bientot.sql
 migration-41-affiche-evenement.sql
+migration-42-quiz-reglement.sql
 "
 LAST=$(echo "$MIGRATIONS" | grep . | tail -1 | sed 's/migration-\([0-9]*\).*/\1/')
 
