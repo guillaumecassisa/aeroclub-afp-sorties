@@ -112,3 +112,54 @@ export async function closeFlight(shareId: string, action: "closed" | "cancelled
 function fmtDate(iso: string) {
   return new Date(iso + "T12:00:00").toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
 }
+
+// ── Photos de vol ─────────────────────────────────────────────────────────────
+
+const PHOTO_BUCKET = "documents";
+
+export type NewPhotos = {
+  paths: string[];
+  caption?: string | null;
+  route?: string | null;
+  aircraft?: string | null;
+  taken_on?: string | null;
+};
+
+/** Enregistre des photos déjà déposées par le navigateur dans photos/<membre>/ */
+export async function registerFlightPhotos(p: NewPhotos): Promise<{ error?: string; count?: number }> {
+  const me = await requireMember();
+  const supabase = await createClient();
+  const prefix = `photos/${me.id}/`;
+  const paths = (p.paths ?? []).filter((x) => typeof x === "string" && x.startsWith(prefix) && /^[\w/.-]+$/.test(x)).slice(0, 20);
+  if (!paths.length) return { error: "Aucune photo à enregistrer." };
+  const clean = (v: string | null | undefined, max: number) => (v ?? "").trim().slice(0, max) || null;
+  const takenOn = p.taken_on && /^\d{4}-\d{2}-\d{2}$/.test(p.taken_on) ? p.taken_on : null;
+  const rows = paths.map((path) => ({
+    user_id: me.id,
+    path,
+    url: supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path).data.publicUrl,
+    caption: clean(p.caption, 300),
+    route: clean(p.route, 80),
+    aircraft: clean(p.aircraft, 40),
+    taken_on: takenOn,
+  }));
+  const { error } = await supabase.from("flight_photos").insert(rows);
+  if (error) {
+    await supabase.storage.from(PHOTO_BUCKET).remove(paths);
+    return { error: error.message };
+  }
+  revalidatePath("/shareflight");
+  return { count: rows.length };
+}
+
+/** Supprime une photo (la sienne, ou n'importe laquelle pour un administrateur) */
+export async function deleteFlightPhoto(id: string) {
+  await requireMember();
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("flight_photos").delete().eq("id", id).select("path").maybeSingle();
+  const back = "/shareflight?onglet=photos";
+  if (error || !data) redirect(`${back}&erreur=${encodeURIComponent(error?.message ?? "Suppression impossible.")}`);
+  await supabase.storage.from(PHOTO_BUCKET).remove([data.path as string]);
+  revalidatePath("/shareflight");
+  redirect(`${back}&ok=${encodeURIComponent("Photo supprimée.")}`);
+}

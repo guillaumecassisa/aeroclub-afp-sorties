@@ -437,7 +437,7 @@ export function FlightBoard({
   );
 
   return (
-    <div className="flex flex-col" style={{ height: "calc(100dvh - 120px)" }}>
+    <div className="flex flex-col" style={{ height: "calc(100dvh - 166px)" }}>
       {/* ── Bandeau proposer un vol ── */}
       <PublishBanner clubAircraft={clubAircraft} />
 

@@ -66,6 +66,9 @@ export async function anonymizeMember(userId: string) {
   // Photo de profil : effacée du stockage
   const { data: files } = await supabase.storage.from("avatars").list(userId);
   if (files?.length) await supabase.storage.from("avatars").remove(files.map((f) => `${userId}/${f.name}`));
+  // Photos de vol partagées
+  const { data: photos } = await supabase.storage.from("documents").list(`photos/${userId}`, { limit: 1000 });
+  if (photos?.length) await supabase.storage.from("documents").remove(photos.map((f) => `photos/${userId}/${f.name}`));
   redirect(
     `/droits?ok=${encodeURIComponent(
       `Données personnelles de ${p?.full_name || "ce membre"} effacées. Dernière étape : supprimez son identifiant de connexion dans Supabase (Authentication → Users).`,
