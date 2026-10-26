@@ -200,6 +200,19 @@ export default async function Page({
             {o.description && <p className="whitespace-pre-line pt-2 text-ink">{o.description}</p>}
           </div>
 
+          {/* Sortie avion : comment les places sont attribuées */}
+          {isFlight && !cancelled && (
+            <div className="flex gap-3 rounded-xl border border-sky/30 bg-sky-soft px-4 py-3 text-sm text-ink">
+              <span aria-hidden className="text-lg leading-none">ℹ️</span>
+              <p>
+                Les places dans les avions sont attribuées <strong>par ordre d&apos;inscription</strong>, dans le respect des
+                lâchers machine (un pilote non lâché sur le type ne vole qu&apos;avec un instructeur à bord). Les passagers
+                qui ne pilotent pas, y compris les accompagnants, peuvent se voir demander une{" "}
+                <strong>participation aux frais</strong> du vol.
+              </p>
+            </div>
+          )}
+
           {/* Mon inscription */}
           {!cancelled && approved && (
             <div className="card p-5">
