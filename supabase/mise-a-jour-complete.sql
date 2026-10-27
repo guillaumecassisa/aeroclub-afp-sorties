@@ -3771,7 +3771,7 @@ on conflict (aircraft_id) do update set
 -- Diamond DA40 (F-HXAF)
 --
 -- Sources : DA40 POH + fiche de pesée F-HXAF
--- MTOW : 1150 kg — MLW : 1092 kg — MZFW : 1150 kg
+-- MTOW : 1200 kg — MLW : 1150 kg — MZFW : 1150 kg (valeurs F-HXAF confirmées par le club)
 -- Datum : bord d'attaque intrados (standard Diamond)
 -- Réservoir : 2 × 64 L = 128 L usable, bras 2.630 m
 -- Postes :
@@ -3793,7 +3793,7 @@ select
   null,
   774.5,            -- fiche de pesée F-HXAF
   1878.16,          -- fiche de pesée F-HXAF  (en kg.m)
-  1150, 1092, 1150,
+  1200, 1150, 1150,
   2.630, 0.72, 128,
   '[
     {"label":"Sièges avant",      "arm":2.300,"max":null},
