@@ -4,7 +4,9 @@ import { requireMember } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Performances décollage / atterrissage" };
 
-const CALCULATEUR_URL = "/outils/performances.html";
+// Le numéro de version force le navigateur à recharger le calculateur après chaque mise à jour du site
+const VERSION = (process.env.VERCEL_GIT_COMMIT_SHA ?? "local").slice(0, 7);
+const CALCULATEUR_URL = `/outils/performances.html?v=${VERSION}`;
 
 export default async function Page() {
   await requireMember();

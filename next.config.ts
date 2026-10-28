@@ -41,7 +41,11 @@ const nextConfig: NextConfig = {
   // Envois de photos (affiches d'événements, réduites dans le navigateur) : 5 Mo maximum
   experimental: { serverActions: { bodySizeLimit: "5mb" } },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // Outils HTML et leurs données : toujours la dernière version (pas de copie périmée dans le navigateur)
+      { source: "/outils/:file*", headers: [{ key: "Cache-Control", value: "no-cache, must-revalidate" }] },
+    ];
   },
 };
 
