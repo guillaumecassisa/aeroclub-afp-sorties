@@ -83,6 +83,15 @@
     padding:9px 10px; color:var(--text); font-family:var(--mono); font-size:16px;
   }
   .field input[type=number]:focus{outline:none; border-color:var(--amber-dim);}
+  .field input[type=text], .field select{
+    width:100%; background:var(--bg-panel); border:1px solid var(--line); border-radius:5px;
+    padding:9px 10px; color:var(--text); font-size:16px; font-family:inherit;
+  }
+  .field input[type=text]:focus, .field select:focus{outline:none; border-color:var(--amber-dim);}
+  .ad-box{border:1px solid var(--line); border-radius:8px; padding:12px; background:#f8fafd;}
+  .ad-box .hint a{color:inherit;}
+  .ad-src-ok{color:#1d7a46; font-weight:600;}
+  .ad-src-warn{color:#9a5b00; font-weight:600;}
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
 
   .segbtns{display:flex; gap:8px;}
@@ -270,8 +279,18 @@
         </div>
       </div>
 
+      <div class="field ad-box">
+        <label>Terrain et piste — remplit QFU, altitude, état de piste et longueur</label>
+        <div class="row2">
+          <input type="text" id="adInput" list="adList" placeholder="LFMA, Aix, Calvi…" autocomplete="off" onchange="onAdInput()" oninput="onAdInput()">
+          <select id="rwySel" onchange="applyRunway()" disabled><option value="">Piste</option></select>
+        </div>
+        <datalist id="adList"></datalist>
+        <div class="hint" id="rwyInfo">Choisissez un terrain puis une piste : la distance déclarée de la carte VAC en vigueur est reprise quand le SIA la publie.</div>
+      </div>
+
       <div class="field">
-        <label>Longueur de piste disponible (m) — optionnel</label>
+        <label id="lbl-pisteLen">Longueur de piste disponible (m) — optionnel</label>
         <input type="number" id="pisteLen" value="" placeholder="ex. 800" oninput="calc()">
       </div>
 
@@ -811,6 +830,89 @@ function calc(){
 
 refreshPhaseUI();
 calc();
+
+/* ── Terrain et piste : QFU, altitude, surface et distance déclarée (VAC SIA) ─────────── */
+let PISTES = {}, adCur = null, adDeclared = {}, adMeta = null, adReq = 0;
+fetch('/outils/pistes.json').then(r => r.json()).then(d => {
+  PISTES = d;
+  const dl = document.getElementById('adList');
+  dl.innerHTML = Object.entries(d).map(([k, v]) => '<option value="' + k + '">' + k + ' — ' + v.n.replace(/</g, '') + '</option>').join('');
+}).catch(() => {});
+
+function onAdInput(){
+  const raw = (document.getElementById('adInput').value || '').trim().toUpperCase();
+  const icao = raw.slice(0, 4);
+  if (!PISTES[icao] || icao === adCur) return;
+  adCur = icao; adDeclared = {}; adMeta = null;
+  const ad = PISTES[icao];
+  document.getElementById('adInput').value = icao + ' — ' + ad.n;
+  const sel = document.getElementById('rwySel');
+  sel.innerHTML = '<option value="">Piste</option>' + ad.r.map((r, i) => '<option value="' + i + '">' + r.id + '</option>').join('');
+  sel.disabled = !ad.r.length;
+  if (typeof ad.e === 'number') { document.getElementById('altiTerrain').value = ad.e; }
+  info(ad.r.length ? 'Lecture de la carte VAC en vigueur…' : 'Aucune piste connue pour ce terrain : saisissez les valeurs de la VAC.', '');
+  const req = ++adReq;
+  fetch('/api/vac-pistes?icao=' + icao, { credentials: 'same-origin' })
+    .then(r => r.ok ? r.json() : null)
+    .then(j => {
+      if (req !== adReq) return;
+      adMeta = j; adDeclared = (j && j.runways) || {};
+      // pistes publiées par la VAC mais absentes de la liste : ajoutées
+      for (const k of Object.keys(adDeclared)) {
+        if (!ad.r.some((r) => r.id === k || r.id.replace(/[LRC]$/, '') === k.replace(/[LRC]$/, ''))) {
+          ad.r.push({ id: k, len: adDeclared[k].lda || adDeclared[k].tora || 0, thr: 0, surf: '' });
+          sel.insertAdjacentHTML('beforeend', '<option value="' + (ad.r.length - 1) + '">' + k + '</option>');
+          sel.disabled = false;
+        }
+      }
+      if (sel.value === '' && ad.r.length) sel.value = '0';
+      applyRunway();
+    })
+    .catch(() => { if (req === adReq) { adMeta = null; applyRunway(); } });
+  calc();
+}
+
+function info(html, cls){
+  const el = document.getElementById('rwyInfo');
+  el.innerHTML = html; el.className = 'hint' + (cls ? ' ' + cls : '');
+}
+
+function applyRunway(){
+  const ad = PISTES[adCur];
+  const i = document.getElementById('rwySel').value;
+  if (!ad || i === '') { calc(); return; }
+  const r = ad.r[+i];
+  const num = parseInt(r.id, 10);
+  document.getElementById('qfu').value = (num === 0 ? 36 : num) * 10;
+  if (r.surf === 'dur' || r.surf === 'herbe') setPiste(r.surf);
+  // distances déclarées de la VAC : même piste, ou même numéro si une seule correspond (ex. 33 ↔ 33L)
+  const base = (x) => x.replace(/[LRC]$/, '');
+  const same = Object.keys(adDeclared).filter((k) => base(k) === base(r.id));
+  const d = adDeclared[r.id] || (same.length === 1 ? adDeclared[same[0]] : null) || {};
+  const deco = phase === 'deco';
+  const official = deco ? (d.tora ?? null) : (d.lda ?? null);
+  const vacLink = adMeta && adMeta.url ? ' · <a href="' + adMeta.url + '" target="_blank" rel="noopener">VAC ' + adCur + ' ↗</a>' : '';
+  let len, html, cls;
+  if (official) {
+    len = official;
+    html = (deco ? 'TORA' : 'LDA') + ' piste ' + r.id + ' : <b>' + official + ' m</b> — carte VAC officielle (cycle ' + (adMeta.cycle || '').replace(/_/g, ' ') + ')' + vacLink;
+    cls = 'ad-src-ok';
+  } else {
+    len = deco ? r.len : Math.max(0, r.len - (r.thr || 0));
+    html = 'Longueur ' + (deco ? '' : 'utilisable à l’atterrissage ') + '≈ <b>' + len + ' m</b>' +
+      (!deco && r.thr ? ' (piste ' + r.len + ' m − seuil décalé ' + r.thr + ' m)' : '') +
+      ' — donnée indicative (OurAirports) : la VAC de ce terrain ne publie pas de distances déclarées, <b>vérifiez-la</b>' + vacLink;
+    cls = 'ad-src-warn';
+  }
+  document.getElementById('pisteLen').value = len;
+  document.getElementById('lbl-pisteLen').textContent = (deco ? 'Distance de décollage disponible (TORA, m)' : 'Distance d’atterrissage disponible (LDA, m)') + ' — modifiable';
+  info(html + (typeof ad.e === 'number' ? ' · altitude terrain ' + ad.e + ' ft' : ''), cls);
+  calc();
+}
+
+// Changement décollage / atterrissage : la distance disponible suit (TORA ↔ LDA)
+const _setPhaseOrig = setPhase;
+setPhase = function(p){ _setPhaseOrig(p); if (adCur && document.getElementById('rwySel').value !== '') applyRunway(); };
 </script>
 </body>
 </html>

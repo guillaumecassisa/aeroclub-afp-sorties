@@ -22,7 +22,8 @@ documents 14 Mo, photos de profil). Largement dans les offres gratuites (500 Mo 
 - **Supabase** : PostgreSQL (toutes les règles métier et de droits sont dans la base : RLS + fonctions
   `security definer`), authentification par email, stockage des fichiers.
 - Emails : SMTP (Gmail) ou Resend. Météo, TAF : aviationweather.gov ; NOTAM : FAA (notams.aim.faa.gov).
-- Export Excel : `exceljs`.
+- Export Excel : `exceljs`. Lecture des VAC (PDF) : `unpdf`.
+- Cartes VAC et distances déclarées : site du SIA (AIP France, cycle AIRAC calculé automatiquement). Pistes, longueurs et altitudes de secours : OurAirports (domaine public), fichier `public/outils/pistes.json` régénéré par `scripts/pistes-ourairports.py`.
 
 ## Organisation du code
 
