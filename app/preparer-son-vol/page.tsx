@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { requireMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { VacFinder } from "./VacFinder";
+import { HOME_ICAO } from "@/lib/club";
+
+// Accès rapide : le terrain du club (les terrains consultés s'ajoutent ensuite, propres à chaque membre)
+const VAC_FAVORITES = [HOME_ICAO];
 
 export const metadata: Metadata = { title: "Préparer son vol" };
 
@@ -70,6 +75,10 @@ export default async function Page() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight text-navy-2">✈️ Préparer son vol</h1>
         <p className="text-sm text-muted">Ressources et checklist pour bien préparer chaque sortie.</p>
+      </div>
+
+      <div className="mb-6">
+        <VacFinder favorites={VAC_FAVORITES} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
