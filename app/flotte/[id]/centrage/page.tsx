@@ -67,7 +67,7 @@ export default async function Page({
       </div>
 
       {missing.length === 0 && mb ? (
-        <Calculator data={mb} title={aircraft.registration} />
+        <Calculator data={mb} title={aircraft.registration} model={aircraft.model} />
       ) : (
         <div className="card p-6">
           <p className="font-bold text-navy-2">Calcul pas encore disponible pour {aircraft.registration}</p>

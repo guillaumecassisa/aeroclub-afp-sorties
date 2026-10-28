@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { compute, type MbData } from "@/lib/mb";
+import { downloadDossierVol, loadDossierPart, saveDossierPart, type MbSnapshot } from "@/lib/dossierVol";
 
 const fmt = (n: number, d = 1, max = d) => n.toLocaleString("fr-FR", { minimumFractionDigits: d, maximumFractionDigits: max });
 
-export function Calculator({ data, title }: { data: MbData; title: string }) {
+export function Calculator({ data, title, model }: { data: MbData; title: string; model: string }) {
   const [loads, setLoads] = useState<string[]>(data.stations.map(() => ""));
   const [fuel, setFuel] = useState("");
   const [trip, setTrip] = useState("");
@@ -16,6 +17,51 @@ export function Calculator({ data, title }: { data: MbData; title: string }) {
     [data, loads, fuel, trip],
   );
   const hasTrip = num(trip) > 0;
+  const [busy, setBusy] = useState(false);
+
+  // Dernier calcul gardé dans le navigateur : repris dans le dossier de vol PDF (avec les performances)
+  const snapshot = useMemo<MbSnapshot>(
+    () => ({
+      model,
+      stations: data.stations.map((s, i) => {
+        const load = num(loads[i]);
+        return { label: s.label, arm: s.arm, load, unit: s.fuel ? "L" : "kg", kg: s.fuel ? load * data.fuel_density : load };
+      }),
+      fuel: {
+        mainL: data.fuel_capacity_l != null && data.fuel_capacity_l > 0 ? num(fuel) : null,
+        tripL: num(trip),
+        density: data.fuel_density,
+        arm: Number(data.fuel_arm),
+      },
+      to: r.to,
+      ldg: r.ldg,
+      zf: r.zf,
+      hasTrip,
+      empty: { mass: Number(data.empty_mass), moment: Number(data.empty_moment) },
+      mtow: data.mtow ?? null,
+      mlw: data.mlw ?? null,
+      mzfw: data.mzfw ?? null,
+      envelope: data.envelope,
+      ok: r.ok,
+      problems: r.problems,
+      source: data.source ?? null,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [data, loads, fuel, trip, r, model],
+  );
+  useEffect(() => {
+    if (loads.some((l) => num(l) > 0) || num(fuel) > 0) saveDossierPart(title, "mb", snapshot);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot, title]);
+
+  async function download() {
+    setBusy(true);
+    try {
+      await downloadDossierVol({ registration: title, model, mb: snapshot, perf: loadDossierPart(title, "perf") });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
@@ -115,8 +161,8 @@ export function Calculator({ data, title }: { data: MbData; title: string }) {
           >
             Réinitialiser
           </button>
-          <button type="button" className="btn-primary" onClick={() => window.print()}>
-            Exporter PDF
+          <button type="button" className="btn-primary" onClick={download} disabled={busy}>
+            {busy ? "Préparation…" : "📄 Dossier de vol (PDF)"}
           </button>
         </div>
       </div>

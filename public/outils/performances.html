@@ -184,6 +184,7 @@
   html.embed .wrap{max-width:none;}
   html.embed header{border-bottom:0; padding-bottom:6px; margin-bottom:14px;}
   html.embed header h1, html.embed #headerSub{display:none;}
+  html.embed header{display:none;} /* l'avion se choisit par son immatriculation, au-dessus du calculateur */
 </style>
 <script>
   if (/[?&]embed=1/.test(location.search)) document.documentElement.classList.add('embed');
@@ -489,6 +490,9 @@ let currentAircraft = 'dr400';
 let phase = 'deco';
 let piste = 'dur';
 const masseParCombo = {}; // clé "aircraft:phase" -> masse saisie
+const pisteLenParPhase = {}; // clé "aircraft:phase" -> distance disponible saisie
+let perfTouched = false; // le pilote a saisi quelque chose (sinon rien n'est gardé pour le dossier de vol)
+['input', 'change', 'click'].forEach((ev) => document.addEventListener(ev, () => { perfTouched = true; }, true));
 
 // =====================================================================
 // UTILITAIRES
@@ -667,6 +671,7 @@ function computeFixed(ac, phaseData, ventKt){
 // =====================================================================
 function setAircraft(id){
   currentAircraft = id;
+  if (window.parent !== window) window.parent.postMessage({ type: 'perf-aircraft', id }, location.origin);
   document.getElementById('aircraftSelect').value = id;
   refreshPhaseUI();
   calc();
@@ -772,6 +777,7 @@ function calc(){
   const ventDir   = parseFloat(document.getElementById('ventDir').value) || 0;
   const ventForce = parseFloat(document.getElementById('ventForce').value) || 0;
   const pisteLenVal = parseFloat(document.getElementById('pisteLen').value);
+  pisteLenParPhase[currentAircraft + ':' + phase] = pisteLenVal > 0 ? pisteLenVal : null;
 
   const wc = windComponents(ventDir, ventForce, qfu);
   updateWindArrow(wc.angle);
@@ -841,6 +847,8 @@ function calc(){
   } else {
     rwSection.style.display = 'none';
   }
+  // Intégré dans le site : la page parente garde le calcul pour le dossier de vol
+  if (window.parent !== window && window.perfDossier && perfTouched) window.parent.postMessage({ type: 'perf-changed' }, location.origin);
 }
 
 refreshPhaseUI();
@@ -930,17 +938,28 @@ function info(html, cls){
   el.innerHTML = html; el.className = 'hint' + (cls ? ' ' + cls : '');
 }
 
-function applyRunway(){
+// Distance disponible d'une piste pour une phase : VAC officielle (TORA / LDA) si publiée, sinon OurAirports
+function runwayAvail(ph){
   const ad = PISTES[adCur];
   const i = document.getElementById('rwySel').value;
-  if (!ad || i === '') { calc(); return; }
+  if (!ad || i === '') return null;
   const r = ad.r[+i];
   // distances déclarées de la VAC : même piste, ou même numéro si une seule correspond (ex. 33 ↔ 33L)
   const base = (x) => x.replace(/[LRC]$/, '');
   const same = Object.keys(adDeclared).filter((k) => base(k) === base(r.id));
   const d = adDeclared[r.id] || (same.length === 1 ? adDeclared[same[0]] : null) || {};
+  const official = ph === 'deco' ? (d.tora ?? null) : (d.lda ?? null);
+  if (official) return { len: official, official: true, runway: r.id };
+  return { len: ph === 'deco' ? r.len : Math.max(0, r.len - (r.thr || 0)), official: false, runway: r.id };
+}
+
+function applyRunway(){
+  const ad = PISTES[adCur];
+  const i = document.getElementById('rwySel').value;
+  if (!ad || i === '') { calc(); return; }
+  const r = ad.r[+i];
   const deco = phase === 'deco';
-  const official = deco ? (d.tora ?? null) : (d.lda ?? null);
+  const official = runwayAvail(phase).official ? runwayAvail(phase).len : null;
   const vacLink = adMeta && adMeta.url ? ' · <a href="' + adMeta.url + '" target="_blank" rel="noopener">VAC ' + adCur + ' ↗</a>' : '';
   let len, html, cls;
   if (official) {
@@ -963,6 +982,65 @@ function applyRunway(){
 // Changement décollage / atterrissage : la distance disponible suit (TORA ↔ LDA)
 const _setPhaseOrig = setPhase;
 setPhase = function(p){ _setPhaseOrig(p); if (adCur && document.getElementById('rwySel').value !== '') applyRunway(); };
+
+// Dossier de vol : toutes les données du calcul, décollage ET atterrissage, pour le PDF généré par le site
+window.perfDossier = function(){
+  const ac = AIRCRAFT[currentAircraft];
+  const v = (id) => document.getElementById(id).value;
+  const altiTerrain = parseFloat(v('altiTerrain')) || 0;
+  const qnhRaw = parseFloat(v('qnh')); const qnh = isNaN(qnhRaw) ? 1013 : qnhRaw;
+  const alti = altiTerrain + (1013 - qnh) * 30;
+  const temp = parseFloat(v('temp')) || 0;
+  const qfu = parseFloat(v('qfu')) || 0;
+  const ventDir = parseFloat(v('ventDir')) || 0;
+  const ventForce = parseFloat(v('ventForce')) || 0;
+  const wc = windComponents(ventDir, ventForce, qfu);
+  const strip = (h) => String(h || '').replace(/<sup>(.*?)<\/sup>/g, '$1').replace(/<[^>]+>/g, '');
+  const phases = {};
+  for (const ph of ['deco', 'atter']) {
+    const pd = ac[ph];
+    const max = pd.altitudes ? pd.massHigh : pd.mass;
+    const masse = (ph === phase ? parseFloat(v('masse')) : masseParCombo[currentAircraft + ':' + ph]) || max;
+    const res = pd.altitudes ? computeGrid(ac, pd, masse, alti, temp, wc.headwind) : computeFixed(ac, pd, wc.headwind);
+    const warnings = res.warnings.slice();
+    if (!pd.altitudes && pd.conditionNote) warnings.push(pd.conditionNote);
+    const refMass = !pd.altitudes ? pd.mass : (pd.massHigh === pd.massLow ? pd.massHigh : null);
+    if (refMass !== null && masse !== refMass) warnings.push('Performances du manuel données pour ' + refMass + ' kg uniquement : distances calculées à ' + refMass + ' kg.');
+    // distance disponible : saisie de la phase affichée, sinon piste choisie, sinon dernière saisie pour cette phase
+    let avail = null, src = '';
+    const rw = runwayAvail(ph);
+    if (ph === phase) {
+      const x = parseFloat(v('pisteLen'));
+      if (x > 0) { avail = x; src = rw && rw.len === x ? (rw.official ? 'VAC officielle' : 'indicative, à vérifier') : 'saisie'; }
+    } else if (rw) { avail = rw.len; src = rw.official ? 'VAC officielle' : 'indicative, à vérifier'; }
+    else if (pisteLenParPhase[currentAircraft + ':' + ph]) { avail = pisteLenParPhase[currentAircraft + ':' + ph]; src = 'saisie'; }
+    const sp = ac.speeds[ph];
+    phases[ph] = {
+      masse, max, roll: Math.round(res.roll), d15: Math.round(res.d15),
+      avail, availSrc: src, margin: avail ? Math.round(avail - res.d15) : null,
+      speeds: [[sp.l1, sp.v1], [sp.l2, sp.v2]].filter((x) => x[0] && x[1]),
+      xwLimit: ac.crosswind[ph], warnings,
+    };
+  }
+  const ad = adCur && PISTES[adCur] ? adCur + ' - ' + PISTES[adCur].n : null;
+  const rwy = runwayAvail(phase);
+  return {
+    aircraftId: currentAircraft, label: ac.label, tail: ac.tail || null,
+    terrain: ad, runway: rwy ? rwy.runway : null, vacCycle: adMeta && adMeta.cycle ? adMeta.cycle.replace(/_/g, ' ') : null,
+    conditions: { altiTerrain, qnh, alti: Math.round(alti), temp, qfu, ventDir, ventForce,
+      headwind: Math.round(wc.headwind), crosswind: Math.round(Math.abs(wc.crosswind)), piste },
+    phases, dataNote: strip(ac.dataNote),
+  };
+};
+
+// Intégré dans le site : la page parente choisit l'avion (immatriculation) et lit le dossier de vol
+if (window.parent !== window) {
+  window.addEventListener('message', (e) => {
+    if (e.origin !== location.origin || !e.data || e.data.type !== 'perf-set-aircraft') return;
+    if (AIRCRAFT[e.data.id] && e.data.id !== currentAircraft) setAircraft(e.data.id);
+  });
+  window.parent.postMessage({ type: 'perf-aircraft', id: currentAircraft }, location.origin);
+}
 
 // Intégré dans le site : la page parente adapte la hauteur du cadre au contenu (pas de 2e barre de défilement)
 if (window.parent !== window) {

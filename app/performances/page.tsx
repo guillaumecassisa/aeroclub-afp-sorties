@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { requireMember } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
 import { PerfFrame } from "./PerfFrame";
 
 export const metadata: Metadata = { title: "Performances décollage / atterrissage" };
@@ -11,6 +12,13 @@ const EMBED_URL = `/calculateur-performances?v=${VERSION}&embed=1`;
 
 export default async function Page() {
   await requireMember();
+  const supabase = await createClient();
+  const { data: fleet } = await supabase
+    .from("aircraft")
+    .select("registration, model, type")
+    .eq("active", true)
+    .order("type")
+    .order("registration");
   return (
     <>
       <Link href="/preparer-son-vol" className="mb-3 inline-block text-sm text-sky hover:underline">
@@ -23,7 +31,7 @@ export default async function Page() {
         </p>
       </div>
 
-      <PerfFrame src={EMBED_URL} />
+      <PerfFrame src={EMBED_URL} fleet={(fleet ?? []) as { registration: string; model: string; type: string }[]} />
 
       <p className="mt-3 text-xs text-muted">
         Outil d&apos;aide à la préparation du vol : les résultats ne remplacent pas le manuel de vol de l&apos;avion ni le
