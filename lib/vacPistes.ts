@@ -46,3 +46,12 @@ export function toLines(items: { str: string; x: number; y: number }[]): string[
   }
   return lines.map((l) => l.items.sort((a, b) => a.x - b.x).map((i) => i.str.trim()).join(" "));
 }
+
+/** Altitude de l'aérodrome publiée en tête de VAC : « ALT AD : 368 (14 hPa) » (en ft). */
+export function parseElevation(lines: string[]): number | null {
+  for (const l of lines) {
+    const m = l.match(/ALT\s*AD\s*:?\s*(-?\d{1,5})\b/);
+    if (m) return Number(m[1]);
+  }
+  return null;
+}

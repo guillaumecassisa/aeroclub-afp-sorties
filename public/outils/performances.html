@@ -855,7 +855,7 @@ refreshPhaseUI();
 calc();
 
 /* ── Terrain et piste : QFU, altitude, surface et distance déclarée (VAC SIA) ─────────── */
-let PISTES = {}, adCur = null, adDeclared = {}, adMeta = null, adReq = 0;
+let PISTES = {}, adCur = null, adDeclared = {}, adMeta = null, adReq = 0, adElev = null;
 fetch('/outils/pistes.json?v=' + Date.now(), { credentials: 'same-origin', cache: 'no-store' }).then(r => r.json()).then(d => {
   PISTES = d;
 }).catch(() => info('Liste des terrains indisponible : rechargez la page, ou saisissez la longueur à la main.', 'terrain-attention'));
@@ -911,6 +911,9 @@ function onAdInput(){
   const sel = document.getElementById('rwySel');
   sel.innerHTML = '<option value="">Piste</option>' + ad.r.map((r, i) => '<option value="' + i + '">' + r.id + '</option>').join('');
   sel.disabled = !ad.r.length;
+  // Altitude terrain : OurAirports tout de suite, remplacée par celle de la carte VAC dès qu'elle est lue
+  adElev = typeof ad.e === 'number' ? { ft: ad.e, vac: false } : null;
+  if (adElev) document.getElementById('altiTerrain').value = adElev.ft;
   info(ad.r.length ? 'Lecture de la carte VAC en vigueur…' : 'Aucune piste connue pour ce terrain : saisissez les valeurs de la VAC.', '');
   const req = ++adReq;
   fetch('/api/vac-pistes?icao=' + icao, { credentials: 'same-origin' })
@@ -918,6 +921,10 @@ function onAdInput(){
     .then(j => {
       if (req !== adReq) return;
       adMeta = j; adDeclared = (j && j.runways) || {};
+      if (j && typeof j.elevation === 'number') {
+        adElev = { ft: j.elevation, vac: true };
+        document.getElementById('altiTerrain').value = j.elevation;
+      }
       // pistes publiées par la VAC mais absentes de la liste : ajoutées
       for (const k of Object.keys(adDeclared)) {
         if (!ad.r.some((r) => r.id === k || r.id.replace(/[LRC]$/, '') === k.replace(/[LRC]$/, ''))) {
@@ -953,10 +960,15 @@ function runwayAvail(ph){
   return { len: ph === 'deco' ? r.len : Math.max(0, r.len - (r.thr || 0)), official: false, runway: r.id };
 }
 
+function elevNote(){
+  if (!adElev) return 'Altitude terrain : à saisir (non publiée)';
+  return 'Altitude terrain ' + adElev.ft + ' ft ' + (adElev.vac ? '(carte VAC)' : '(OurAirports, à vérifier)');
+}
+
 function applyRunway(){
   const ad = PISTES[adCur];
   const i = document.getElementById('rwySel').value;
-  if (!ad || i === '') { calc(); return; }
+  if (!ad || i === '') { if (ad) info(elevNote(), ''); calc(); return; }
   const r = ad.r[+i];
   const deco = phase === 'deco';
   const official = runwayAvail(phase).official ? runwayAvail(phase).len : null;
@@ -975,7 +987,7 @@ function applyRunway(){
   }
   document.getElementById('pisteLen').value = len;
   document.getElementById('lbl-pisteLen').textContent = (deco ? 'Distance de décollage disponible (TORA, m)' : 'Distance d’atterrissage disponible (LDA, m)') + ' — modifiable';
-  info(html, cls);
+  info(html + ' · ' + elevNote(), cls);
   calc();
 }
 

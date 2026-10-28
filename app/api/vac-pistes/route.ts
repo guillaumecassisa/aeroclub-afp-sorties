@@ -2,11 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getDocumentProxy } from "unpdf";
 import { getCurrentProfile } from "@/lib/auth";
 import { airacFolder, currentAiracDate, vacUrl } from "@/lib/vac";
-import { parseDeclaredDistances, toLines } from "@/lib/vacPistes";
+import { parseDeclaredDistances, parseElevation, toLines } from "@/lib/vacPistes";
 
 export const runtime = "nodejs";
 
-// Distances déclarées d'un aérodrome, lues dans sa VAC en vigueur (mise en cache pour la durée du cycle)
+// Distances déclarées et altitude d'un aérodrome, lues dans sa VAC en vigueur (mise en cache pour la durée du cycle)
 export async function GET(request: NextRequest) {
   const me = await getCurrentProfile();
   if (!me || me.role === "pending") return NextResponse.json({ error: "Connexion requise." }, { status: 401 });
@@ -32,8 +32,9 @@ export async function GET(request: NextRequest) {
       );
     }
     const runways = parseDeclaredDistances(lines);
+    const elevation = parseElevation(lines);
     return NextResponse.json(
-      { icao, cycle: airacFolder(cycle), url, found: true, runways },
+      { icao, cycle: airacFolder(cycle), url, found: true, runways, elevation },
       { headers: { "cache-control": "private, max-age=3600" } },
     );
   } catch {
