@@ -88,15 +88,15 @@
     padding:9px 10px; color:var(--text); font-size:16px; font-family:inherit;
   }
   .field input[type=text]:focus, .field select:focus{outline:none; border-color:var(--amber-dim);}
-  .ad-box{border:1px solid var(--line); border-radius:8px; padding:12px; background:#f8fafd;}
-  .ad-box .hint a{color:inherit;}
-  .ad-search{position:relative;}
-  .ad-sugg{position:absolute; z-index:20; left:0; right:0; top:100%; margin-top:2px; background:#fff; border:1px solid var(--line); border-radius:6px; box-shadow:0 6px 18px rgba(0,0,0,.12); max-height:260px; overflow:auto; display:none;}
-  .ad-sugg button{display:block; width:100%; text-align:left; padding:8px 12px; border:0; background:none; font:inherit; font-size:14px; cursor:pointer;}
-  .ad-sugg button:hover, .ad-sugg button.on{background:#eef2f8;}
-  .ad-sugg b{font-family:monospace;}
-  .ad-src-ok{color:#1d7a46; font-weight:600;}
-  .ad-src-warn{color:#9a5b00; font-weight:600;}
+  .terrain-cadre{border:1px solid var(--line); border-radius:8px; padding:12px; background:#f8fafd;}
+  .terrain-cadre .hint a{color:inherit;}
+  .terrain-recherche{position:relative;}
+  .terrain-liste{position:absolute; z-index:20; left:0; right:0; top:100%; margin-top:2px; background:#fff; border:1px solid var(--line); border-radius:6px; box-shadow:0 6px 18px rgba(0,0,0,.12); max-height:260px; overflow:auto; display:none;}
+  .terrain-liste button{display:block; width:100%; text-align:left; padding:8px 12px; border:0; background:none; font:inherit; font-size:14px; cursor:pointer;}
+  .terrain-liste button:hover, .terrain-liste button.on{background:#eef2f8;}
+  .terrain-liste b{font-family:monospace;}
+  .terrain-ok{color:#1d7a46; font-weight:600;}
+  .terrain-attention{color:#9a5b00; font-weight:600;}
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
 
   .segbtns{display:flex; gap:8px;}
@@ -291,12 +291,12 @@
         </div>
       </div>
 
-      <div class="field ad-box">
+      <div class="field terrain-cadre">
         <label>Terrain et piste — remplit la longueur disponible ci-dessous</label>
         <div class="row2">
-          <div class="ad-search">
-            <input type="text" id="adInput" placeholder="Code OACI ou nom : LFMA, Aix, Calvi…" autocomplete="off" oninput="adSuggest()" onfocus="this.select(); adSuggest()" onkeydown="adKey(event)" onblur="setTimeout(adHide, 150)">
-            <div class="ad-sugg" id="adSugg"></div>
+          <div class="terrain-recherche">
+            <input type="text" id="terrainSaisie" placeholder="Code OACI ou nom : LFMA, Aix, Calvi…" autocomplete="off" oninput="adSuggest()" onfocus="this.select(); adSuggest()" onkeydown="adKey(event)" onblur="setTimeout(adHide, 150)">
+            <div class="terrain-liste" id="terrainListe"></div>
           </div>
           <select id="rwySel" onchange="applyRunway()" disabled><option value="">Piste</option></select>
         </div>
@@ -850,14 +850,14 @@ calc();
 let PISTES = {}, adCur = null, adDeclared = {}, adMeta = null, adReq = 0;
 fetch('/outils/pistes.json?v=' + Date.now(), { credentials: 'same-origin', cache: 'no-store' }).then(r => r.json()).then(d => {
   PISTES = d;
-}).catch(() => info('Liste des terrains indisponible : rechargez la page, ou saisissez la longueur à la main.', 'ad-src-warn'));
+}).catch(() => info('Liste des terrains indisponible : rechargez la page, ou saisissez la longueur à la main.', 'terrain-attention'));
 
 // Recherche par code OACI ou par nom (sans tenir compte des accents)
 const norm = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
 let adHits = [], adPos = -1;
 function adSuggest(){
-  const q = norm((document.getElementById('adInput').value || '').trim().replace(/ — .*$/, ''));
-  const box = document.getElementById('adSugg');
+  const q = norm((document.getElementById('terrainSaisie').value || '').trim().replace(/ — .*$/, ''));
+  const box = document.getElementById('terrainListe');
   if (!q) { adHits = []; box.style.display = 'none'; return; }
   const starts = [], inName = [];
   for (const [k, v] of Object.entries(PISTES)) {
@@ -875,31 +875,31 @@ function adKey(e){
     if (!adHits.length) return;
     e.preventDefault();
     adPos = (adPos + (e.key === 'ArrowDown' ? 1 : -1) + adHits.length) % adHits.length;
-    [...document.querySelectorAll('#adSugg button')].forEach((b, i) => b.classList.toggle('on', i === adPos));
+    [...document.querySelectorAll('#terrainListe button')].forEach((b, i) => b.classList.toggle('on', i === adPos));
   } else if (e.key === 'Enter') {
     e.preventDefault();
     if (adPos >= 0 && adHits[adPos]) selectAd(adHits[adPos]);
   } else if (e.key === 'Escape') adHide();
 }
 function adHide(){
-  document.getElementById('adSugg').style.display = 'none';
-  if (adCur && PISTES[adCur]) document.getElementById('adInput').value = adCur + ' — ' + PISTES[adCur].n;
+  document.getElementById('terrainListe').style.display = 'none';
+  if (adCur && PISTES[adCur]) document.getElementById('terrainSaisie').value = adCur + ' — ' + PISTES[adCur].n;
 }
 function selectAd(icao){
   adCur = null;
-  document.getElementById('adInput').value = icao;
+  document.getElementById('terrainSaisie').value = icao;
   onAdInput();
   adHide();
-  document.getElementById('adInput').blur();
+  document.getElementById('terrainSaisie').blur();
 }
 
 function onAdInput(){
-  const raw = (document.getElementById('adInput').value || '').trim().toUpperCase();
+  const raw = (document.getElementById('terrainSaisie').value || '').trim().toUpperCase();
   const icao = raw.slice(0, 4);
   if (!PISTES[icao] || icao === adCur) return;
   adCur = icao; adDeclared = {}; adMeta = null;
   const ad = PISTES[icao];
-  document.getElementById('adInput').value = icao + ' — ' + ad.n;
+  document.getElementById('terrainSaisie').value = icao + ' — ' + ad.n;
   const sel = document.getElementById('rwySel');
   sel.innerHTML = '<option value="">Piste</option>' + ad.r.map((r, i) => '<option value="' + i + '">' + r.id + '</option>').join('');
   sel.disabled = !ad.r.length;
@@ -946,13 +946,13 @@ function applyRunway(){
   if (official) {
     len = official;
     html = (deco ? 'TORA' : 'LDA') + ' piste ' + r.id + ' : <b>' + official + ' m</b> — carte VAC officielle (cycle ' + (adMeta.cycle || '').replace(/_/g, ' ') + ')' + vacLink;
-    cls = 'ad-src-ok';
+    cls = 'terrain-ok';
   } else {
     len = deco ? r.len : Math.max(0, r.len - (r.thr || 0));
     html = 'Longueur ' + (deco ? '' : 'utilisable à l’atterrissage ') + '≈ <b>' + len + ' m</b>' +
       (!deco && r.thr ? ' (piste ' + r.len + ' m − seuil décalé ' + r.thr + ' m)' : '') +
       ' — donnée indicative (OurAirports) : la VAC de ce terrain ne publie pas de distances déclarées, <b>vérifiez-la</b>' + vacLink;
-    cls = 'ad-src-warn';
+    cls = 'terrain-attention';
   }
   document.getElementById('pisteLen').value = len;
   document.getElementById('lbl-pisteLen').textContent = (deco ? 'Distance de décollage disponible (TORA, m)' : 'Distance d’atterrissage disponible (LDA, m)') + ' — modifiable';
