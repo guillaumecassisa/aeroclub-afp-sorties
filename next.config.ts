@@ -1,4 +1,17 @@
 import type { NextConfig } from "next";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+
+// Empreinte des outils HTML : leur adresse change dès que leur contenu change (jamais d'ancienne copie en cache)
+const toolsVersion = (() => {
+  try {
+    const h = createHash("sha1");
+    for (const f of ["public/outils/performances.html", "public/outils/pistes.json"]) h.update(readFileSync(f));
+    return h.digest("hex").slice(0, 10);
+  } catch {
+    return String(Date.now());
+  }
+})();
 
 // Adresse de la base (Supabase) autorisée pour les images, envois de fichiers et connexions
 const supaOrigin = (() => {
@@ -38,13 +51,14 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  env: { TOOLS_VERSION: toolsVersion },
   // Envois de photos (affiches d'événements, réduites dans le navigateur) : 5 Mo maximum
   experimental: { serverActions: { bodySizeLimit: "5mb" } },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
       // Outils HTML et leurs données : toujours la dernière version (pas de copie périmée dans le navigateur)
-      { source: "/outils/:file*", headers: [{ key: "Cache-Control", value: "no-cache, must-revalidate" }] },
+      { source: "/outils/:file*", headers: [{ key: "Cache-Control", value: "no-store, max-age=0" }] },
     ];
   },
 };

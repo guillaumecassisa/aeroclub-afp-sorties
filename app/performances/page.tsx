@@ -6,7 +6,7 @@ import { PerfFrame } from "./PerfFrame";
 export const metadata: Metadata = { title: "Performances décollage / atterrissage" };
 
 // Le numéro de version force le navigateur à recharger le calculateur après chaque mise à jour du site
-const VERSION = (process.env.VERCEL_GIT_COMMIT_SHA ?? "local").slice(0, 7);
+const VERSION = process.env.TOOLS_VERSION ?? "1";
 const EMBED_URL = `/outils/performances.html?v=${VERSION}&embed=1`;
 
 export default async function Page() {

@@ -848,7 +848,7 @@ calc();
 
 /* ── Terrain et piste : QFU, altitude, surface et distance déclarée (VAC SIA) ─────────── */
 let PISTES = {}, adCur = null, adDeclared = {}, adMeta = null, adReq = 0;
-fetch('/outils/pistes.json', { credentials: 'same-origin', cache: 'no-cache' }).then(r => r.json()).then(d => {
+fetch('/outils/pistes.json?v=' + Date.now(), { credentials: 'same-origin', cache: 'no-store' }).then(r => r.json()).then(d => {
   PISTES = d;
 }).catch(() => info('Liste des terrains indisponible : rechargez la page, ou saisissez la longueur à la main.', 'ad-src-warn'));
 
