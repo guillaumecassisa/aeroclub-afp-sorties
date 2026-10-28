@@ -26,10 +26,23 @@ export function PerfFrame({ src, fleet }: { src: string; fleet: Plane[] }) {
   const plane = fleet.find((p) => p.registration === reg) ?? null;
   const calc = () => ref.current?.contentWindow as PerfWindow | null | undefined;
 
-  // L'avion choisi pilote le calculateur
+  // L'avion choisi pilote le calculateur, avec les masses de sa masse et centrage du jour
+  const sync = () => {
+    const cur = fleet.find((p) => p.registration === regRef.current);
+    const w = calc();
+    if (!cur || !w) return;
+    const id = perfId(cur.type);
+    w.postMessage({ type: "perf-set-aircraft", id }, window.location.origin);
+    const mb = loadDossierPart(cur.registration, "mb");
+    w.postMessage(
+      { type: "perf-set-masses", id, reg: cur.registration, to: mb?.to.mass ?? null, ldg: mb?.ldg.mass ?? null, hasTrip: mb?.hasTrip ?? false },
+      window.location.origin,
+    );
+  };
   useEffect(() => {
-    if (plane) calc()?.postMessage({ type: "perf-set-aircraft", id: perfId(plane.type) }, window.location.origin);
-  }, [plane]);
+    sync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reg]);
 
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
@@ -50,8 +63,7 @@ export function PerfFrame({ src, fleet }: { src: string; fleet: Plane[] }) {
       }
       // Le calculateur annonce son avion (au chargement) : on l'aligne sur l'immatriculation choisie
       if (d?.type === "perf-aircraft" && d.id) {
-        const cur = fleet.find((p) => p.registration === regRef.current);
-        if (cur && perfId(cur.type) !== d.id) calc()?.postMessage({ type: "perf-set-aircraft", id: perfId(cur.type) }, window.location.origin);
+        sync();
       }
     };
     window.addEventListener("message", onMsg);
@@ -119,7 +131,7 @@ export function PerfFrame({ src, fleet }: { src: string; fleet: Plane[] }) {
         scrolling="no"
         style={{ height: h }}
         className="block w-full border-0 bg-transparent"
-        onLoad={() => plane && calc()?.postMessage({ type: "perf-set-aircraft", id: perfId(plane.type) }, window.location.origin)}
+        onLoad={sync}
       />
     </>
   );

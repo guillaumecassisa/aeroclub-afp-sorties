@@ -218,7 +218,22 @@
         <label id="lbl-masse">Masse (kg)</label>
         <input type="number" id="masse" value="1100" max="1100" min="0" oninput="onMasseInput()">
         <div class="note-inactive" id="noteMasseFixed">Masse fixe pour cet avion (pas d'interpolation de masse disponible dans le manuel).</div>
+        <div class="hint" id="masseSrc"></div>
       </div>
+
+      <div class="field terrain-cadre">
+        <label>Terrain et piste — remplit l’altitude terrain et la distance disponible</label>
+        <div class="row2">
+          <div class="terrain-recherche">
+            <input type="text" id="terrainSaisie" placeholder="Code OACI ou nom : LFMA, Aix, Calvi…" autocomplete="off" oninput="adSuggest()" onfocus="this.select(); adSuggest()" onkeydown="adKey(event)" onblur="setTimeout(adHide, 150)">
+            <div class="terrain-liste" id="terrainListe"></div>
+          </div>
+          <select id="rwySel" onchange="applyRunway()" disabled><option value="">Piste</option></select>
+        </div>
+        <div class="hint" id="rwyInfo">Choisissez un terrain puis une piste : la distance déclarée de la carte VAC en vigueur est reprise quand le SIA la publie.</div>
+      </div>
+
+
 
       <div class="row2">
         <div class="field">
@@ -291,19 +306,6 @@
           <button id="piste-herbe" onclick="setPiste('herbe')">Herbe sèche</button>
         </div>
       </div>
-
-      <div class="field terrain-cadre">
-        <label>Terrain et piste — remplit la longueur disponible ci-dessous</label>
-        <div class="row2">
-          <div class="terrain-recherche">
-            <input type="text" id="terrainSaisie" placeholder="Code OACI ou nom : LFMA, Aix, Calvi…" autocomplete="off" oninput="adSuggest()" onfocus="this.select(); adSuggest()" onkeydown="adKey(event)" onblur="setTimeout(adHide, 150)">
-            <div class="terrain-liste" id="terrainListe"></div>
-          </div>
-          <select id="rwySel" onchange="applyRunway()" disabled><option value="">Piste</option></select>
-        </div>
-        <div class="hint" id="rwyInfo">Choisissez un terrain puis une piste : la distance déclarée de la carte VAC en vigueur est reprise quand le SIA la publie.</div>
-      </div>
-
 
       <div class="field">
         <label id="lbl-pisteLen">Longueur de piste disponible (m) — optionnel</label>
@@ -490,6 +492,7 @@ let currentAircraft = 'dr400';
 let phase = 'deco';
 let piste = 'dur';
 const masseParCombo = {}; // clé "aircraft:phase" -> masse saisie
+const masseMb = {}; // clé "aircraft:phase" -> masse reprise de la page Masse et centrage
 const pisteLenParPhase = {}; // clé "aircraft:phase" -> distance disponible saisie
 let perfTouched = false; // le pilote a saisi quelque chose (sinon rien n'est gardé pour le dossier de vol)
 ['input', 'change', 'click'].forEach((ev) => document.addEventListener(ev, () => { perfTouched = true; }, true));
@@ -708,6 +711,7 @@ function refreshPhaseUI(){
   el.max = maxMasse; el.min = 0;
   el.value = masseParCombo[currentAircraft+':'+phase] || maxMasse;
   document.getElementById('noteMasseFixed').classList.remove('show');
+  showMasseSrc();
 
   // notes "mode fixed" (pas de correction alti/temp/vent)
   const isFixed = !pd.altitudes;
@@ -751,11 +755,24 @@ function setPiste(p){
   calc();
 }
 
+function showMasseSrc(){
+  const m = masseMb[currentAircraft + ':' + phase];
+  const el = document.getElementById('masseSrc');
+  const cur = parseFloat(document.getElementById('masse').value);
+  if (!m) { el.textContent = ''; return; }
+  const max = parseFloat(document.getElementById('masse').max);
+  el.className = 'hint' + (m.kg > max ? ' terrain-attention' : '');
+  el.textContent = m.kg > max
+    ? 'Masse et centrage : ' + m.kg + ' kg, au-dessus du maximum du manuel (' + max + ' kg) !'
+    : (Math.round(cur) === Math.round(m.kg) ? 'Reprise de la masse et centrage ' + m.reg + ' (' + m.label + ')' : 'Masse et centrage ' + m.reg + ' : ' + m.kg + ' kg (' + m.label + ')');
+}
+
 function onMasseInput(skipCalc){
   const el = document.getElementById('masse');
   const max = parseFloat(el.max);
   if (!el.readOnly && el.value !== '' && parseFloat(el.value) > max) el.value = max;
   masseParCombo[currentAircraft+':'+phase] = parseFloat(el.value) || masseParCombo[currentAircraft+':'+phase];
+  showMasseSrc();
   if (!skipCalc) calc();
 }
 
@@ -1050,6 +1067,20 @@ if (window.parent !== window) {
   window.addEventListener('message', (e) => {
     if (e.origin !== location.origin || !e.data || e.data.type !== 'perf-set-aircraft') return;
     if (AIRCRAFT[e.data.id] && e.data.id !== currentAircraft) setAircraft(e.data.id);
+  });
+  // Masses de la page Masse et centrage (calcul du jour pour cette immatriculation)
+  window.addEventListener('message', (e) => {
+    if (e.origin !== location.origin || !e.data || e.data.type !== 'perf-set-masses' || !AIRCRAFT[e.data.id]) return;
+    const d = e.data;
+    for (const [ph, kg, label] of [['deco', d.to, 'masse au décollage'], ['atter', d.ldg, d.hasTrip ? 'masse à l’atterrissage' : 'masse au décollage, délestage non saisi']]) {
+      const key = d.id + ':' + ph;
+      if (typeof kg !== 'number' || !(kg > 0)) { delete masseMb[key]; continue; }
+      const r = Math.round(kg);
+      masseMb[key] = { kg: r, reg: d.reg, label };
+      const pd = AIRCRAFT[d.id][ph];
+      masseParCombo[key] = Math.min(r, pd.altitudes ? pd.massHigh : pd.mass);
+    }
+    if (d.id === currentAircraft) { refreshPhaseUI(); calc(); }
   });
   window.parent.postMessage({ type: 'perf-aircraft', id: currentAircraft }, location.origin);
 }
