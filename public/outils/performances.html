@@ -90,6 +90,11 @@
   .field input[type=text]:focus, .field select:focus{outline:none; border-color:var(--amber-dim);}
   .ad-box{border:1px solid var(--line); border-radius:8px; padding:12px; background:#f8fafd;}
   .ad-box .hint a{color:inherit;}
+  .ad-search{position:relative;}
+  .ad-sugg{position:absolute; z-index:20; left:0; right:0; top:100%; margin-top:2px; background:#fff; border:1px solid var(--line); border-radius:6px; box-shadow:0 6px 18px rgba(0,0,0,.12); max-height:260px; overflow:auto; display:none;}
+  .ad-sugg button{display:block; width:100%; text-align:left; padding:8px 12px; border:0; background:none; font:inherit; font-size:14px; cursor:pointer;}
+  .ad-sugg button:hover, .ad-sugg button.on{background:#eef2f8;}
+  .ad-sugg b{font-family:monospace;}
   .ad-src-ok{color:#1d7a46; font-weight:600;}
   .ad-src-warn{color:#9a5b00; font-weight:600;}
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
@@ -211,10 +216,12 @@
       <div class="field ad-box">
         <label>Terrain et piste — remplit QFU, altitude, état de piste et longueur</label>
         <div class="row2">
-          <input type="text" id="adInput" list="adList" placeholder="LFMA, Aix, Calvi…" autocomplete="off" onchange="onAdInput()" oninput="onAdInput()">
+          <div class="ad-search">
+            <input type="text" id="adInput" placeholder="Code OACI ou nom : LFMA, Aix, Calvi…" autocomplete="off" oninput="adSuggest()" onfocus="this.select(); adSuggest()" onkeydown="adKey(event)" onblur="setTimeout(adHide, 150)">
+            <div class="ad-sugg" id="adSugg"></div>
+          </div>
           <select id="rwySel" onchange="applyRunway()" disabled><option value="">Piste</option></select>
         </div>
-        <datalist id="adList"></datalist>
         <div class="hint" id="rwyInfo">Choisissez un terrain puis une piste : la distance déclarée de la carte VAC en vigueur est reprise quand le SIA la publie.</div>
       </div>
 
@@ -841,11 +848,52 @@ calc();
 
 /* ── Terrain et piste : QFU, altitude, surface et distance déclarée (VAC SIA) ─────────── */
 let PISTES = {}, adCur = null, adDeclared = {}, adMeta = null, adReq = 0;
-fetch('/outils/pistes.json').then(r => r.json()).then(d => {
+fetch('/outils/pistes.json', { credentials: 'same-origin', cache: 'no-cache' }).then(r => r.json()).then(d => {
   PISTES = d;
-  const dl = document.getElementById('adList');
-  dl.innerHTML = Object.entries(d).map(([k, v]) => '<option value="' + k + '">' + k + ' — ' + v.n.replace(/</g, '') + '</option>').join('');
-}).catch(() => {});
+  // Terrain de base proposé d'office
+  if (!adCur && PISTES.LFMA) selectAd('LFMA');
+}).catch(() => info('Liste des terrains indisponible : rechargez la page, ou saisissez la longueur à la main.', 'ad-src-warn'));
+
+// Recherche par code OACI ou par nom (sans tenir compte des accents)
+const norm = (x) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+let adHits = [], adPos = -1;
+function adSuggest(){
+  const q = norm((document.getElementById('adInput').value || '').trim().replace(/ — .*$/, ''));
+  const box = document.getElementById('adSugg');
+  if (!q) { adHits = []; box.style.display = 'none'; return; }
+  const starts = [], inName = [];
+  for (const [k, v] of Object.entries(PISTES)) {
+    if (k.startsWith(q)) starts.push(k);
+    else if (norm(v.n).includes(q)) inName.push(k);
+  }
+  adHits = starts.concat(inName).slice(0, 12); adPos = adHits.length ? 0 : -1;
+  box.innerHTML = adHits.length
+    ? adHits.map((k, i) => '<button type="button" class="' + (i === adPos ? 'on' : '') + '" onmousedown="event.preventDefault(); selectAd(\'' + k + '\')"><b>' + k + '</b> — ' + PISTES[k].n.replace(/</g, '') + '</button>').join('')
+    : '<div class="hint" style="padding:8px 12px">Aucun terrain trouvé</div>';
+  box.style.display = 'block';
+}
+function adKey(e){
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    if (!adHits.length) return;
+    e.preventDefault();
+    adPos = (adPos + (e.key === 'ArrowDown' ? 1 : -1) + adHits.length) % adHits.length;
+    [...document.querySelectorAll('#adSugg button')].forEach((b, i) => b.classList.toggle('on', i === adPos));
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (adPos >= 0 && adHits[adPos]) selectAd(adHits[adPos]);
+  } else if (e.key === 'Escape') adHide();
+}
+function adHide(){
+  document.getElementById('adSugg').style.display = 'none';
+  if (adCur && PISTES[adCur]) document.getElementById('adInput').value = adCur + ' — ' + PISTES[adCur].n;
+}
+function selectAd(icao){
+  adCur = null;
+  document.getElementById('adInput').value = icao;
+  onAdInput();
+  adHide();
+  document.getElementById('adInput').blur();
+}
 
 function onAdInput(){
   const raw = (document.getElementById('adInput').value || '').trim().toUpperCase();
