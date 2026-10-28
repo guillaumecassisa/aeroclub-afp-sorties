@@ -1,12 +1,14 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { requireMember } from "@/lib/auth";
+import { PerfFrame } from "./PerfFrame";
 
 export const metadata: Metadata = { title: "Performances décollage / atterrissage" };
 
 // Le numéro de version force le navigateur à recharger le calculateur après chaque mise à jour du site
 const VERSION = (process.env.VERCEL_GIT_COMMIT_SHA ?? "local").slice(0, 7);
 const CALCULATEUR_URL = `/outils/performances.html?v=${VERSION}`;
+const EMBED_URL = `${CALCULATEUR_URL}&embed=1`;
 
 export default async function Page() {
   await requireMember();
@@ -27,13 +29,7 @@ export default async function Page() {
         </a>
       </div>
 
-      <div className="card overflow-hidden">
-        <iframe
-          src={CALCULATEUR_URL}
-          title="Calculateur de performances décollage / atterrissage"
-          className="block h-[calc(100dvh-230px)] min-h-[640px] w-full border-0 bg-white"
-        />
-      </div>
+      <PerfFrame src={EMBED_URL} />
 
       <p className="mt-3 text-xs text-muted">
         Outil d&apos;aide à la préparation du vol : les résultats ne remplacent pas le manuel de vol de l&apos;avion ni le

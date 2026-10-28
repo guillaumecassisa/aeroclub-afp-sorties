@@ -174,7 +174,15 @@
   .card h2{color:#002157;}
   .toggle button, .segbtns button{border-radius:999px;}
   header{border-bottom:3px solid #e4002b;}
+  /* Intégré dans la page « Performances » du site (?embed=1) : sans cadre ni titre en double */
+  html.embed body{padding:0 0 8px; background:transparent;}
+  html.embed .wrap{max-width:none;}
+  html.embed header{border-bottom:0; padding-bottom:6px; margin-bottom:14px;}
+  html.embed header h1, html.embed #headerSub{display:none;}
 </style>
+<script>
+  if (/[?&]embed=1/.test(location.search)) document.documentElement.classList.add('embed');
+</script>
 <body>
 <div class="wrap">
 
@@ -913,6 +921,13 @@ function applyRunway(){
 // Changement décollage / atterrissage : la distance disponible suit (TORA ↔ LDA)
 const _setPhaseOrig = setPhase;
 setPhase = function(p){ _setPhaseOrig(p); if (adCur && document.getElementById('rwySel').value !== '') applyRunway(); };
+
+// Intégré dans le site : la page parente adapte la hauteur du cadre au contenu (pas de 2e barre de défilement)
+if (window.parent !== window) {
+  const sendHeight = () => window.parent.postMessage({ type: 'perf-height', h: document.querySelector('.wrap').getBoundingClientRect().bottom + window.scrollY }, location.origin);
+  new ResizeObserver(sendHeight).observe(document.querySelector('.wrap'));
+  window.addEventListener('load', sendHeight);
+}
 </script>
 </body>
 </html>
