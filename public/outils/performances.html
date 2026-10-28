@@ -222,7 +222,7 @@
       </div>
 
       <div class="field terrain-cadre">
-        <label>Terrain et piste — remplit l’altitude terrain et la distance disponible</label>
+        <label id="terrainCadreTitre">Terrain et piste de décollage — remplit l’altitude terrain et la distance disponible</label>
         <div class="row2">
           <div class="terrain-recherche">
             <input type="text" id="terrainSaisie" placeholder="Code OACI ou nom : LFMA, Aix, Calvi…" autocomplete="off" oninput="adSuggest()" onfocus="this.select(); adSuggest()" onkeydown="adKey(event)" onblur="setTimeout(adHide, 150)">
@@ -872,7 +872,11 @@ refreshPhaseUI();
 calc();
 
 /* ── Terrain et piste : QFU, altitude, surface et distance déclarée (VAC SIA) ─────────── */
-let PISTES = {}, adCur = null, adDeclared = {}, adMeta = null, adReq = 0, adElev = null;
+let PISTES = {}, adReq = 0;
+// Terrain et piste propres à chaque phase : on peut décoller d'une piste (ou d'un terrain) et atterrir sur une autre
+const newAd = () => ({ icao: null, declared: {}, meta: null, elev: null, rwy: '', alti: null });
+const AD = { deco: newAd(), atter: newAd() };
+const S = () => AD[phase];
 fetch('/outils/pistes.json?v=' + Date.now(), { credentials: 'same-origin', cache: 'no-store' }).then(r => r.json()).then(d => {
   PISTES = d;
 }).catch(() => info('Liste des terrains indisponible : rechargez la page, ou saisissez la longueur à la main.', 'terrain-attention'));
@@ -908,53 +912,64 @@ function adKey(e){
 }
 function adHide(){
   document.getElementById('terrainListe').style.display = 'none';
-  if (adCur && PISTES[adCur]) document.getElementById('terrainSaisie').value = adCur + ' — ' + PISTES[adCur].n;
+  const st = S();
+  document.getElementById('terrainSaisie').value = st.icao && PISTES[st.icao] ? st.icao + ' — ' + PISTES[st.icao].n : '';
 }
 function selectAd(icao){
-  adCur = null;
+  S().icao = null;
   document.getElementById('terrainSaisie').value = icao;
   onAdInput();
   adHide();
   document.getElementById('terrainSaisie').blur();
 }
 
+// Liste des pistes du terrain de la phase affichée
+function fillRunways(){
+  const st = S(), sel = document.getElementById('rwySel');
+  const ad = st.icao ? PISTES[st.icao] : null;
+  sel.innerHTML = '<option value="">Piste</option>' + (ad ? ad.r.map((r, i) => '<option value="' + i + '">' + r.id + '</option>').join('') : '');
+  sel.disabled = !ad || !ad.r.length;
+  sel.value = st.rwy;
+}
+
 function onAdInput(){
   const raw = (document.getElementById('terrainSaisie').value || '').trim().toUpperCase();
   const icao = raw.slice(0, 4);
-  if (!PISTES[icao] || icao === adCur) return;
-  adCur = icao; adDeclared = {}; adMeta = null;
+  const st = S();
+  if (!PISTES[icao] || icao === st.icao) return;
+  Object.assign(st, newAd(), { icao });
   const ad = PISTES[icao];
   document.getElementById('terrainSaisie').value = icao + ' — ' + ad.n;
-  const sel = document.getElementById('rwySel');
-  sel.innerHTML = '<option value="">Piste</option>' + ad.r.map((r, i) => '<option value="' + i + '">' + r.id + '</option>').join('');
-  sel.disabled = !ad.r.length;
+  fillRunways();
   // Altitude terrain : OurAirports tout de suite, remplacée par celle de la carte VAC dès qu'elle est lue
-  adElev = typeof ad.e === 'number' ? { ft: ad.e, vac: false } : null;
-  if (adElev) document.getElementById('altiTerrain').value = adElev.ft;
+  st.elev = typeof ad.e === 'number' ? { ft: ad.e, vac: false } : null;
+  if (st.elev) { st.alti = st.elev.ft; document.getElementById('altiTerrain').value = st.elev.ft; }
   info(ad.r.length ? 'Lecture de la carte VAC en vigueur…' : 'Aucune piste connue pour ce terrain : saisissez les valeurs de la VAC.', '');
-  const req = ++adReq;
+  loadVac(st, ++adReq);
+  calc();
+}
+
+function loadVac(st, req){
+  const icao = st.icao, ad = PISTES[icao];
   fetch('/api/vac-pistes?icao=' + icao, { credentials: 'same-origin' })
     .then(r => r.ok ? r.json() : null)
     .then(j => {
-      if (req !== adReq) return;
-      adMeta = j; adDeclared = (j && j.runways) || {};
+      if (st.icao !== icao) return;
+      st.meta = j; st.declared = (j && j.runways) || {};
+      const shown = st === S();
       if (j && typeof j.elevation === 'number') {
-        adElev = { ft: j.elevation, vac: true };
-        document.getElementById('altiTerrain').value = j.elevation;
+        st.elev = { ft: j.elevation, vac: true }; st.alti = j.elevation;
+        if (shown) document.getElementById('altiTerrain').value = j.elevation;
       }
       // pistes publiées par la VAC mais absentes de la liste : ajoutées
-      for (const k of Object.keys(adDeclared)) {
-        if (!ad.r.some((r) => r.id === k || r.id.replace(/[LRC]$/, '') === k.replace(/[LRC]$/, ''))) {
-          ad.r.push({ id: k, len: adDeclared[k].lda || adDeclared[k].tora || 0, thr: 0, surf: '' });
-          sel.insertAdjacentHTML('beforeend', '<option value="' + (ad.r.length - 1) + '">' + k + '</option>');
-          sel.disabled = false;
-        }
+      for (const k of Object.keys(st.declared)) {
+        if (!ad.r.some((r) => r.id === k || r.id.replace(/[LRC]$/, '') === k.replace(/[LRC]$/, '')))
+          ad.r.push({ id: k, len: st.declared[k].lda || st.declared[k].tora || 0, thr: 0, surf: '' });
       }
-      if (sel.value === '' && ad.r.length) sel.value = '0';
-      applyRunway();
+      if (st.rwy === '' && ad.r.length) st.rwy = '0';
+      if (shown) { fillRunways(); applyRunway(); }
     })
-    .catch(() => { if (req === adReq) { adMeta = null; applyRunway(); } });
-  calc();
+    .catch(() => { if (st.icao === icao && st === S()) applyRunway(); });
 }
 
 function info(html, cls){
@@ -962,55 +977,70 @@ function info(html, cls){
   el.innerHTML = html; el.className = 'hint' + (cls ? ' ' + cls : '');
 }
 
-// Distance disponible d'une piste pour une phase : VAC officielle (TORA / LDA) si publiée, sinon OurAirports
+// Distance disponible de la piste choisie pour une phase : VAC officielle (TORA / LDA) si publiée, sinon OurAirports
 function runwayAvail(ph){
-  const ad = PISTES[adCur];
-  const i = document.getElementById('rwySel').value;
-  if (!ad || i === '') return null;
-  const r = ad.r[+i];
+  const st = AD[ph];
+  const ad = st.icao ? PISTES[st.icao] : null;
+  if (!ad || st.rwy === '' || !ad.r[+st.rwy]) return null;
+  const r = ad.r[+st.rwy];
   // distances déclarées de la VAC : même piste, ou même numéro si une seule correspond (ex. 33 ↔ 33L)
   const base = (x) => x.replace(/[LRC]$/, '');
-  const same = Object.keys(adDeclared).filter((k) => base(k) === base(r.id));
-  const d = adDeclared[r.id] || (same.length === 1 ? adDeclared[same[0]] : null) || {};
+  const same = Object.keys(st.declared).filter((k) => base(k) === base(r.id));
+  const d = st.declared[r.id] || (same.length === 1 ? st.declared[same[0]] : null) || {};
   const official = ph === 'deco' ? (d.tora ?? null) : (d.lda ?? null);
-  if (official) return { len: official, official: true, runway: r.id };
-  return { len: ph === 'deco' ? r.len : Math.max(0, r.len - (r.thr || 0)), official: false, runway: r.id };
+  if (official) return { len: official, official: true, runway: r.id, r };
+  return { len: ph === 'deco' ? r.len : Math.max(0, r.len - (r.thr || 0)), official: false, runway: r.id, r };
 }
 
 function elevNote(){
-  if (!adElev) return 'Altitude terrain : à saisir (non publiée)';
-  return 'Altitude terrain ' + adElev.ft + ' ft ' + (adElev.vac ? '(carte VAC)' : '(OurAirports, à vérifier)');
+  const e = S().elev;
+  if (!e) return 'Altitude terrain : à saisir (non publiée)';
+  return 'Altitude terrain ' + e.ft + ' ft ' + (e.vac ? '(carte VAC)' : '(OurAirports, à vérifier)');
 }
 
 function applyRunway(){
-  const ad = PISTES[adCur];
-  const i = document.getElementById('rwySel').value;
-  if (!ad || i === '') { if (ad) info(elevNote(), ''); calc(); return; }
-  const r = ad.r[+i];
+  const st = S();
+  st.rwy = document.getElementById('rwySel').value;
   const deco = phase === 'deco';
-  const official = runwayAvail(phase).official ? runwayAvail(phase).len : null;
-  const vacLink = adMeta && adMeta.url ? ' · <a href="' + adMeta.url + '" target="_blank" rel="noopener">VAC ' + adCur + ' ↗</a>' : '';
-  let len, html, cls;
-  if (official) {
-    len = official;
-    html = (deco ? 'TORA' : 'LDA') + ' piste ' + r.id + ' : <b>' + official + ' m</b> — carte VAC officielle (cycle ' + (adMeta.cycle || '').replace(/_/g, ' ') + ')' + vacLink;
+  const rw = runwayAvail(phase);
+  if (!rw) { info(st.icao ? elevNote() : 'Choisissez un terrain puis une piste : la distance déclarée de la carte VAC en vigueur est reprise quand le SIA la publie.', ''); calc(); return; }
+  const r = rw.r;
+  const vacLink = st.meta && st.meta.url ? ' · <a href="' + st.meta.url + '" target="_blank" rel="noopener">VAC ' + st.icao + ' ↗</a>' : '';
+  let html, cls;
+  if (rw.official) {
+    html = (deco ? 'TORA' : 'LDA') + ' piste ' + r.id + ' : <b>' + rw.len + ' m</b> — carte VAC officielle (cycle ' + ((st.meta && st.meta.cycle) || '').replace(/_/g, ' ') + ')' + vacLink;
     cls = 'terrain-ok';
   } else {
-    len = deco ? r.len : Math.max(0, r.len - (r.thr || 0));
-    html = 'Longueur ' + (deco ? '' : 'utilisable à l’atterrissage ') + '≈ <b>' + len + ' m</b>' +
+    html = 'Longueur ' + (deco ? '' : 'utilisable à l’atterrissage ') + '≈ <b>' + rw.len + ' m</b>' +
       (!deco && r.thr ? ' (piste ' + r.len + ' m − seuil décalé ' + r.thr + ' m)' : '') +
       ' — donnée indicative (OurAirports) : la VAC de ce terrain ne publie pas de distances déclarées, <b>vérifiez-la</b>' + vacLink;
     cls = 'terrain-attention';
   }
-  document.getElementById('pisteLen').value = len;
+  document.getElementById('pisteLen').value = rw.len;
   document.getElementById('lbl-pisteLen').textContent = (deco ? 'Distance de décollage disponible (TORA, m)' : 'Distance d’atterrissage disponible (LDA, m)') + ' — modifiable';
   info(html + ' · ' + elevNote(), cls);
   calc();
 }
 
-// Changement décollage / atterrissage : la distance disponible suit (TORA ↔ LDA)
+// Changement décollage / atterrissage : chaque phase garde son terrain, sa piste, son altitude et sa distance
 const _setPhaseOrig = setPhase;
-setPhase = function(p){ _setPhaseOrig(p); if (adCur && document.getElementById('rwySel').value !== '') applyRunway(); };
+setPhase = function(p){
+  if (p === phase) return _setPhaseOrig(p);
+  const prev = AD[phase], st = AD[p];
+  const altEl = document.getElementById('altiTerrain'), lenEl = document.getElementById('pisteLen');
+  prev.alti = isNaN(parseFloat(altEl.value)) ? null : parseFloat(altEl.value);
+  // 1re fois sur cette phase : même terrain et même piste par défaut (modifiables)
+  if (!st.icao && prev.icao) Object.assign(st, { icao: prev.icao, declared: prev.declared, meta: prev.meta, elev: prev.elev, rwy: prev.rwy, alti: prev.alti });
+  // les champs de la nouvelle phase sont remis AVANT le calcul
+  if (st.alti != null) altEl.value = st.alti;
+  lenEl.value = pisteLenParPhase[currentAircraft + ':' + p] || '';
+  _setPhaseOrig(p);
+  document.getElementById('terrainSaisie').value = st.icao && PISTES[st.icao] ? st.icao + ' — ' + PISTES[st.icao].n : '';
+  fillRunways();
+  document.getElementById('terrainCadreTitre').textContent = 'Terrain et piste ' + (p === 'deco' ? 'de décollage' : 'd’atterrissage') + ' — remplit l’altitude terrain et la distance disponible';
+  document.getElementById('lbl-pisteLen').textContent = (p === 'deco' ? 'Distance de décollage disponible (TORA, m)' : 'Distance d’atterrissage disponible (LDA, m)') + (runwayAvail(p) ? ' — modifiable' : ' — optionnel');
+  if (runwayAvail(p)) applyRunway(); else { info(st.icao ? elevNote() : 'Choisissez un terrain puis une piste : la distance déclarée de la carte VAC en vigueur est reprise quand le SIA la publie.', ''); calc(); }
+};
 
 // Dossier de vol : toutes les données du calcul, décollage ET atterrissage, pour le PDF généré par le site
 window.perfDossier = function(){
@@ -1030,7 +1060,10 @@ window.perfDossier = function(){
     const pd = ac[ph];
     const max = pd.altitudes ? pd.massHigh : pd.mass;
     const masse = (ph === phase ? parseFloat(v('masse')) : masseParCombo[currentAircraft + ':' + ph]) || max;
-    const res = pd.altitudes ? computeGrid(ac, pd, masse, alti, temp, wc.headwind) : computeFixed(ac, pd, wc.headwind);
+    // altitude du terrain de cette phase (terrain d'arrivée différent possible)
+    const altT = ph === phase ? altiTerrain : (AD[ph].alti ?? altiTerrain);
+    const altP = altT + (1013 - qnh) * 30;
+    const res = pd.altitudes ? computeGrid(ac, pd, masse, altP, temp, wc.headwind) : computeFixed(ac, pd, wc.headwind);
     const warnings = res.warnings.slice();
     if (!pd.altitudes && pd.conditionNote) warnings.push(pd.conditionNote);
     const refMass = !pd.altitudes ? pd.mass : (pd.massHigh === pd.massLow ? pd.massHigh : null);
@@ -1044,18 +1077,20 @@ window.perfDossier = function(){
     } else if (rw) { avail = rw.len; src = rw.official ? 'VAC officielle' : 'indicative, à vérifier'; }
     else if (pisteLenParPhase[currentAircraft + ':' + ph]) { avail = pisteLenParPhase[currentAircraft + ':' + ph]; src = 'saisie'; }
     const sp = ac.speeds[ph];
+    const st = AD[ph];
     phases[ph] = {
+      terrain: st.icao && PISTES[st.icao] ? st.icao + ' - ' + PISTES[st.icao].n : null,
+      runway: rw ? rw.runway : null, altiTerrain: altT, alti: Math.round(altP),
+      vacCycle: st.meta && st.meta.cycle ? st.meta.cycle.replace(/_/g, ' ') : null,
       masse, max, roll: Math.round(res.roll), d15: Math.round(res.d15),
       avail, availSrc: src, margin: avail ? Math.round(avail - res.d15) : null,
       speeds: [[sp.l1, sp.v1], [sp.l2, sp.v2]].filter((x) => x[0] && x[1]),
       xwLimit: ac.crosswind[ph], warnings,
     };
   }
-  const ad = adCur && PISTES[adCur] ? adCur + ' - ' + PISTES[adCur].n : null;
-  const rwy = runwayAvail(phase);
   return {
     aircraftId: currentAircraft, label: ac.label, tail: ac.tail || null,
-    terrain: ad, runway: rwy ? rwy.runway : null, vacCycle: adMeta && adMeta.cycle ? adMeta.cycle.replace(/_/g, ' ') : null,
+    terrain: phases.deco.terrain, runway: phases.deco.runway, vacCycle: phases.deco.vacCycle || phases.atter.vacCycle,
     conditions: { altiTerrain, qnh, alti: Math.round(alti), temp, qfu, ventDir, ventForce,
       headwind: Math.round(wc.headwind), crosswind: Math.round(Math.abs(wc.crosswind)), piste },
     phases, dataNote: strip(ac.dataNote),

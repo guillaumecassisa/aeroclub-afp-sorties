@@ -24,6 +24,11 @@ export type MbSnapshot = {
 };
 
 export type PerfPhase = {
+  terrain?: string | null;
+  runway?: string | null;
+  altiTerrain?: number;
+  alti?: number;
+  vacCycle?: string | null;
   masse: number;
   max: number;
   roll: number;
@@ -337,17 +342,24 @@ export async function buildDossierVol(opts: DossierOpts) {
     y += 10;
   } else {
     const c = pf.conditions;
+    const pd = pf.phases.deco, pa = pf.phases.atter;
+    const where = (p: PerfPhase, fallback: string | null, rwy: string | null) => {
+      const tr = p.terrain ?? fallback;
+      const r = p.runway ?? rwy;
+      return tr ? `${tr}${r ? ` — piste ${r}` : ""}` : "non choisi";
+    };
+    const alt = (p: PerfPhase) => `${n(p.altiTerrain ?? c.altiTerrain)} ft (Zp ${n(p.alti ?? c.alti)} ft)`;
     const cond: [string, string][] = [
-      ["Terrain", pf.terrain ? `${pf.terrain}${pf.runway ? ` — piste ${pf.runway}` : ""}` : "non choisi"],
-      ["QFU", `${n(c.qfu)}°`],
-      ["Altitude terrain", `${n(c.altiTerrain)} ft`],
+      ["Terrain décollage", where(pd, pf.terrain, pf.runway)],
+      ["Terrain atterrissage", where(pa, pf.terrain, null)],
+      ["Altitude décollage", alt(pd)],
+      ["Altitude atterrissage", alt(pa)],
       ["QNH", `${n(c.qnh)} hPa`],
-      ["Altitude pression", `${n(c.alti)} ft`],
+      ["QFU", `${n(c.qfu)}°`],
       ["Température (OAT)", `${n(c.temp)} °C`],
       ["Vent", c.ventForce ? `${String(Math.round(c.ventDir)).padStart(3, "0")}° / ${n(c.ventForce)} kt` : "calme"],
       ["Composantes", c.ventForce ? `${c.headwind >= 0 ? "face" : "arrière"} ${Math.abs(c.headwind)} kt · travers ${c.crosswind} kt` : "-"],
       ["État de piste", c.piste === "herbe" ? "herbe sèche" : "dur sec"],
-      ["Données de", pf.label],
     ];
     const half = CW / 2;
     for (let i = 0; i < cond.length; i += 2) {
@@ -357,7 +369,7 @@ export async function buildDossierVol(opts: DossierOpts) {
         font(7, "bold", GREY);
         text(kv[0], x0, y);
         font(8.5, "bold");
-        text(kv[1], x0 + 30, y, { maxWidth: half - 32 });
+        text(kv[1], x0 + 33, y, { maxWidth: half - 35 });
       });
       y += 4.6;
     }
