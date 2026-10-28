@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: "Performances décollage / atterrissa
 
 // Le numéro de version force le navigateur à recharger le calculateur après chaque mise à jour du site
 const VERSION = process.env.TOOLS_VERSION ?? "1";
-const EMBED_URL = `/outils/performances.html?v=${VERSION}&embed=1`;
+const EMBED_URL = `/calculateur-performances?v=${VERSION}&embed=1`;
 
 export default async function Page() {
   await requireMember();

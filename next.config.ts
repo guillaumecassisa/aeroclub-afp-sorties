@@ -52,6 +52,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   env: { TOOLS_VERSION: toolsVersion },
+  // Le calculateur est lu par la route /calculateur-performances : on l'embarque avec elle
+  outputFileTracingIncludes: { "/calculateur-performances": ["./public/outils/performances.html"] },
   // Envois de photos (affiches d'événements, réduites dans le navigateur) : 5 Mo maximum
   experimental: { serverActions: { bodySizeLimit: "5mb" } },
   async headers() {
