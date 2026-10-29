@@ -41,7 +41,8 @@ export async function GET() {
     { h: "", sub: "COPI", w: 8, get: (e) => days(e.copilot_min), fmt: "[h]:mm" },
     { h: "", sub: "DC", w: 8, get: (e) => days(e.dual_min), fmt: "[h]:mm" },
     { h: "", sub: "INST", w: 8, get: (e) => days(e.instructor_min), fmt: "[h]:mm" },
-    { h: "Simulateur", sub: "Type", w: 10, get: (e) => e.sim_type },
+    { h: "Simulateur", sub: "Date", w: 11, get: (e) => (e.sim_date ? new Date(e.sim_date + "T12:00:00Z") : null), fmt: "dd/mm/yyyy" },
+    { h: "", sub: "Type", w: 10, get: (e) => e.sim_type },
     { h: "", sub: "Durée", w: 8, get: (e) => days(e.sim_min), fmt: "[h]:mm" },
     { h: "Remarques et appositions", w: 40, get: (e) => (e.kind === "report" ? `Report des heures antérieures${e.remarks ? ` — ${e.remarks}` : ""}` : e.remarks) },
   ];

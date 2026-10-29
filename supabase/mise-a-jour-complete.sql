@@ -1,5 +1,5 @@
 -- =====================================================================
---  MISE À JOUR COMPLÈTE (n°2 à n°45) d'une base existante.
+--  MISE À JOUR COMPLÈTE (n°2 à n°46) d'une base existante.
 --  Peut être relancée autant de fois que nécessaire : elle n'ajoute que ce qui
 --  manque et ne modifie aucune donnée saisie sur le site.
 --  Supabase > SQL Editor > New query > coller tout le fichier > Run.
@@ -9319,6 +9319,21 @@ select 'MISE A JOUR 45 OK' as resultat,
        to_regclass('public.logbook_settings') is not null as table_reglages;
 
 
+-- =====================================================================
+-- migration-46-carnet-simulateur.sql
+-- =====================================================================
+-- =====================================================================
+--  Mise à jour n°46 : carnet de vol — date de la séance de simulateur
+--  Colonne « Séances de simulateur : Date / Type / Durée » du carnet EASA.
+--  Peut être exécutée plusieurs fois sans risque.
+--  À exécuter dans Supabase > SQL Editor > New query > Run.
+-- =====================================================================
+alter table public.logbook_entries add column if not exists sim_date date;
+
+select 'MISE A JOUR 46 OK' as resultat,
+       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'logbook_entries' and column_name = 'sim_date') as colonne_sim_date;
+
+
 -- ===================== Vérification finale =====================
 notify pgrst, 'reload schema';
 select
@@ -9357,7 +9372,7 @@ select
     and exists (select 1 from pg_proc where proname = 'quiz_today_set')
     and exists (select 1 from public._seeds where name = 'quiz-flotte-35')
     and exists (select 1 from public._seeds where name = 'quiz-reglement-42')
-    and to_regclass('public.shop_stock') is not null and to_regclass('public.quiz_daily_set') is not null and exists (select 1 from pg_trigger where tgname = 'on_auth_user_deleted') and to_regclass('public.shop_settings') is not null and exists (select 1 from pg_proc where proname = 'set_outing_poster') and exists (select 1 from pg_proc where proname = 'bar_members') and to_regclass('public.flight_photos') is not null and to_regclass('public.logbook_entries') is not null and (select is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'outings' and column_name = 'departure_at') = 'YES'
+    and to_regclass('public.shop_stock') is not null and to_regclass('public.quiz_daily_set') is not null and exists (select 1 from pg_trigger where tgname = 'on_auth_user_deleted') and to_regclass('public.shop_settings') is not null and exists (select 1 from pg_proc where proname = 'set_outing_poster') and exists (select 1 from pg_proc where proname = 'bar_members') and to_regclass('public.flight_photos') is not null and to_regclass('public.logbook_entries') is not null and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'logbook_entries' and column_name = 'sim_date') and (select is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'outings' and column_name = 'departure_at') = 'YES'
   as "TOUT EST A JOUR",
   (select count(*) from public.profiles) as membres,
   (select string_agg(registration, ', ' order by registration) from public.aircraft) as avions,

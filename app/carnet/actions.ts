@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { blockMinutes, parseDuration, type Fn } from "@/lib/carnet";
+import { blockMinutes, parseDuration } from "@/lib/carnet";
 
 export type CarnetState = { ok?: string; error?: string; savedId?: string } | undefined;
 
@@ -36,7 +36,8 @@ export async function saveEntry(_: CarnetState, fd: FormData): Promise<CarnetSta
     const arr_time = time(fd, "arr_time");
     let total = dur("total", "Durée totale");
     if (!total && kind === "vol") total = blockMinutes(dep_time, arr_time) ?? 0;
-    if (kind === "vol" && !total) return { error: "Indiquez la durée du vol, ou les heures de départ et d'arrivée." };
+    if (kind === "vol" && !total && !parseDuration(String(fd.get("sim") ?? "")))
+      return { error: "Indiquez la durée totale du vol, ou les heures de départ et d'arrivée." };
 
     const row: Record<string, unknown> = {
       kind,
@@ -71,16 +72,21 @@ export async function saveEntry(_: CarnetState, fd: FormData): Promise<CarnetSta
         ifr_min: dur("ifr", "Temps IFR"),
       });
     } else {
-      // Vol : les colonnes « temps comme pilote en fonction » découlent de la fonction à bord
-      const fn = String(fd.get("function") ?? "cdb") as Fn;
+      // Vol : chaque colonne du carnet est saisie comme sur le carnet papier
+      const sim_date = String(fd.get("sim_date") ?? "");
       Object.assign(row, {
-        pic_min: fn === "cdb" || fn === "inst" ? total : 0,
-        dual_min: fn === "dc" ? total : 0,
-        instructor_min: fn === "inst" ? total : 0,
-        copilot_min: fn === "copi" ? total : 0,
-        se_min: fd.get("multi") === "on" ? 0 : total,
-        me_min: fd.get("multi") === "on" ? total : 0,
-        multi_pilot_min: 0,
+        se_min: dur("se", "SE"),
+        me_min: dur("me", "ME"),
+        multi_pilot_min: dur("multi_pilot", "Multi-pilote"),
+        pic_min: dur("pic", "CDB"),
+        copilot_min: dur("copilot", "COPI"),
+        dual_min: dur("dual", "DC"),
+        instructor_min: dur("instructor", "INST"),
+        night_min: dur("night", "Nuit"),
+        ifr_min: dur("ifr", "IFR"),
+        sim_date: /^\d{4}-\d{2}-\d{2}$/.test(sim_date) ? sim_date : null,
+        sim_type: str(fd, "sim_type", 40),
+        sim_min: dur("sim", "Durée simulateur"),
       });
     }
 

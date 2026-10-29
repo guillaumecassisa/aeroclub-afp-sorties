@@ -89,3 +89,4 @@ Secrets GitHub (sauvegarde nocturne uniquement, jamais dans Vercel) : `SUPABASE_
 | 43 | Bar : gestion (noms et emails des membres ayant une ardoise, pour les relances) |
 | 44 | Shareflight : photos de vol |
 | 45 | Carnet de vol personnel (vols, report d'heures, échéance SEP) |
+| 46 | Carnet de vol : date des séances de simulateur |

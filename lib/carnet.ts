@@ -28,13 +28,14 @@ export type LogEntry = {
   copilot_min: number;
   dual_min: number;
   instructor_min: number;
+  sim_date: string | null;
   sim_type: string | null;
   sim_min: number;
   remarks: string | null;
 };
 
 export const ENTRY_COLUMNS =
-  "id, kind, flight_date, dep_place, dep_time, arr_place, arr_time, aircraft_model, aircraft_reg, se_min, me_min, multi_pilot_min, total_min, pic_name, landings_day, landings_night, ifr_approaches, night_min, ifr_min, pic_min, copilot_min, dual_min, instructor_min, sim_type, sim_min, remarks";
+  "id, kind, flight_date, dep_place, dep_time, arr_place, arr_time, aircraft_model, aircraft_reg, se_min, me_min, multi_pilot_min, total_min, pic_name, landings_day, landings_night, ifr_approaches, night_min, ifr_min, pic_min, copilot_min, dual_min, instructor_min, sim_date, sim_type, sim_min, remarks";
 
 /** 95 -> « 1:35 » (heures:minutes, comme dans un carnet de vol) */
 export function hm(min: number | null | undefined): string {
