@@ -41,6 +41,12 @@ export function CarnetClient({ entries, fleet, today }: { entries: LogEntry[]; f
     [entries],
   );
   const reports = entries.filter((e) => e.kind === "report");
+  // Avions déjà notés par le pilote hors flotte du club (proposés en plus des avions du club)
+  const mine = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const e of flights) if (e.aircraft_reg && !fleet.some((p) => p.registration === e.aircraft_reg)) m.set(e.aircraft_reg, e.aircraft_model ?? "");
+    return [...m].map(([registration, model]) => ({ registration, model })).sort((a, b) => a.registration.localeCompare(b.registration));
+  }, [flights, fleet]);
   const carried = reports.reduce(add, zero());
   const pages = Math.max(1, Math.ceil((flights.length + 1) / PER_PAGE)); // + la ligne de saisie
   const [page, setPage] = useState(pages - 1);
@@ -112,7 +118,7 @@ export function CarnetClient({ entries, fleet, today }: { entries: LogEntry[]; f
             <tbody>
               {rows.map((e) =>
                 editing === e.id ? (
-                  <EntryRow key={e.id} entry={e} fleet={fleet} today={today} prevArr={null} onDone={done} />
+                  <EntryRow key={e.id} entry={e} fleet={fleet} mine={mine} today={today} prevArr={null} onDone={done} />
                 ) : (
                   <tr key={e.id} className="hover:bg-sky-soft/40">
                     <td className={`${TD} whitespace-nowrap`}>{frDate(e.flight_date)}</td>
@@ -140,7 +146,7 @@ export function CarnetClient({ entries, fleet, today }: { entries: LogEntry[]; f
                 ),
               )}
               {lastPage && !editing && (
-                <EntryRow key={`new-${flights.length}`} entry={null} fleet={fleet} today={today} prevArr={flights.at(-1)?.arr_place ?? null} onDone={done} />
+                <EntryRow key={`new-${flights.length}`} entry={null} fleet={fleet} mine={mine} today={today} prevArr={flights.at(-1)?.arr_place ?? null} onDone={done} />
               )}
               {/* lignes vides pour garder l'aspect de la page */}
               {Array.from({ length: Math.max(0, PER_PAGE - rows.length - (lastPage && !editing ? 1 : 0)) }).map((_, i) => (
@@ -205,7 +211,7 @@ function TotRow({ label, t, muted, strong, note }: { label: string; t: Tot; mute
 const IN = "min-w-0 rounded border border-line bg-white px-1 py-0.5 text-[12.5px] focus:border-navy-2 focus:outline-none";
 
 /** Une ligne du carnet en saisie : mêmes colonnes que le carnet */
-function EntryRow({ entry, fleet, today, prevArr, onDone }: { entry: LogEntry | null; fleet: Plane[]; today: string; prevArr: string | null; onDone: (m?: CarnetState) => void }) {
+function EntryRow({ entry, fleet, mine, today, prevArr, onDone }: { entry: LogEntry | null; fleet: Plane[]; mine: Plane[]; today: string; prevArr: string | null; onDone: (m?: CarnetState) => void }) {
   const [state, action] = useActionState<CarnetState, FormData>(saveEntry, undefined);
   const formId = `ligne-${entry?.id ?? "nouvelle"}`;
   const form = useRef<HTMLFormElement>(null);
@@ -262,10 +268,12 @@ function EntryRow({ entry, fleet, today, prevArr, onDone }: { entry: LogEntry | 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state]);
 
+  const known = [...fleet, ...mine];
+  const [other, setOther] = useState(() => !!entry?.aircraft_reg && !known.some((p) => p.registration === entry.aircraft_reg));
   const pickReg = (val: string) => {
     const r = val.toUpperCase();
-    const f = fleet.find((p) => p.registration === r);
-    setV((o) => ({ ...o, aircraft_reg: r, aircraft_model: f ? f.model : o.aircraft_model }));
+    const f = known.find((p) => p.registration === r);
+    setV((o) => ({ ...o, aircraft_reg: r, aircraft_model: f ? f.model || o.aircraft_model : o.aircraft_model }));
   };
   const bad = (s: string) => parseDuration(s) == null;
   const inp = (k: keyof typeof v, o: { w: string; ph?: string; up?: boolean; time?: boolean; num?: boolean; d?: boolean }) => (
@@ -279,7 +287,6 @@ function EntryRow({ entry, fleet, today, prevArr, onDone }: { entry: LogEntry | 
         placeholder={o.ph}
         onChange={(e) => (k === "aircraft_reg" ? pickReg(e.target.value) : (k === "total" && setTotalTouched(true), set(k, o.up ? e.target.value.toUpperCase() : e.target.value)))}
         className={`${IN} ${o.w} ${o.d ? "text-right tabular-nums" : ""} ${o.d && bad(v[k]) ? "border-danger text-danger" : ""}`}
-        list={k === "aircraft_reg" ? "carnet-fleet" : undefined}
       />
     </td>
   );
@@ -292,9 +299,6 @@ function EntryRow({ entry, fleet, today, prevArr, onDone }: { entry: LogEntry | 
             <input type="hidden" name="id" value={entry?.id ?? ""} />
             <input type="hidden" name="kind" value="vol" />
           </form>
-          <datalist id="carnet-fleet">
-            {fleet.map((p) => <option key={p.registration} value={p.registration}>{p.model}</option>)}
-          </datalist>
           <input form={formId} type="date" name="flight_date" required max={today} value={v.flight_date} onChange={(e) => set("flight_date", e.target.value)} className={`${IN} w-32`} />
         </td>
         {inp("dep_place", { w: "w-16", ph: "LFMA", up: true })}
@@ -302,7 +306,46 @@ function EntryRow({ entry, fleet, today, prevArr, onDone }: { entry: LogEntry | 
         {inp("arr_place", { w: "w-16", ph: "LFMA", up: true })}
         {inp("arr_time", { w: "w-[86px]", time: true })}
         {inp("aircraft_model", { w: "w-20", ph: "DR400" })}
-        {inp("aircraft_reg", { w: "w-20", ph: "F-HCLI", up: true })}
+        {other ? (
+          <td className={`${TD} bg-wait-soft/60 p-0.5 whitespace-nowrap`}>
+            <input
+              form={formId}
+              name="aircraft_reg"
+              autoFocus={!entry}
+              value={v.aircraft_reg}
+              onChange={(e) => pickReg(e.target.value)}
+              placeholder="F-GXXX"
+              className={`${IN} w-20 uppercase`}
+              maxLength={20}
+            />
+            <button type="button" title="Choisir dans la liste" onClick={() => setOther(false)} className="ml-0.5 text-xs text-sky hover:underline">liste</button>
+          </td>
+        ) : (
+          <td className={`${TD} bg-wait-soft/60 p-0.5`}>
+            <input type="hidden" form={formId} name="aircraft_reg" value={v.aircraft_reg} />
+            <select
+              value={v.aircraft_reg}
+              onChange={(e) => {
+                if (e.target.value === "__autre") {
+                  setOther(true);
+                  setV((o) => ({ ...o, aircraft_reg: "" }));
+                } else pickReg(e.target.value);
+              }}
+              className={`${IN} w-28`}
+            >
+              <option value="">—</option>
+              <optgroup label="Avions du club">
+                {fleet.map((p) => <option key={p.registration} value={p.registration}>{p.registration} · {p.model}</option>)}
+              </optgroup>
+              {mine.length > 0 && (
+                <optgroup label="Mes autres avions">
+                  {mine.map((p) => <option key={p.registration} value={p.registration}>{p.registration}{p.model ? ` · ${p.model}` : ""}</option>)}
+                </optgroup>
+              )}
+              <option value="__autre">＋ Autre immatriculation…</option>
+            </select>
+          </td>
+        )}
         {inp("se", { w: "w-14", d: true })}
         {inp("me", { w: "w-14", d: true })}
         {inp("multi_pilot", { w: "w-14", d: true })}
