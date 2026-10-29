@@ -1,4 +1,4 @@
-import { hm, type Recap } from "@/lib/carnet";
+import { hm, type Check, type Recap } from "@/lib/carnet";
 
 const frDate = (d: string | null) =>
   d ? new Date(d + "T12:00:00Z").toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }) : "—";
@@ -15,8 +15,10 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
   );
 }
 
-export function RecapBand({ r, sepForm }: { r: Recap; sepForm: React.ReactNode }) {
+export function RecapBand({ r, licenceForm }: { r: Recap; licenceForm: React.ReactNode }) {
   const p = r.passengers;
+  const n = r.night;
+  const lapl = r.licence.licence_type === "LAPL";
   return (
     <section className="relative left-1/2 mb-5 w-[calc(100vw-2rem)] max-w-[1900px] -translate-x-1/2 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
       {/* Totaux et activité récente */}
@@ -29,60 +31,91 @@ export function RecapBand({ r, sepForm }: { r: Recap; sepForm: React.ReactNode }
         <Stat label="Dernier vol" value={r.lastFlight ? frDate(r.lastFlight) : "—"} sub={r.totals.night ? `nuit ${hm(r.totals.night)}` : undefined} />
       </div>
 
-      <div className="grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)]">
-        {/* Emport de passagers */}
-        <div className={`rounded-xl border px-4 py-2.5 ${p.ok ? "border-ok/30 bg-ok-soft" : "border-danger/30 bg-danger-soft"}`}>
-          <p className="flex flex-wrap items-baseline gap-x-2 text-[11px] font-bold tracking-wide text-muted uppercase">
-            Emport de passagers · FCL.060
-            <span className={`text-sm tracking-normal normal-case ${p.ok ? "text-ok" : "text-danger"}`}>{p.ok ? "✓ Autorisé de jour" : "✕ Non autorisé"}</span>
-          </p>
+      {/* Ma licence */}
+      <div className="border-b border-line bg-paper px-4 py-2">{licenceForm}</div>
+
+      <div className="grid gap-3 p-3 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)]">
+        {/* Emport de passagers de jour */}
+        <Card ok={p.ok} bad={!p.ok}>
+          <Title label="Emport de passagers · FCL.060" status={p.ok ? "✓ Autorisé de jour" : "✕ Non autorisé"} tone={p.ok ? "ok" : "bad"} />
           <p className="text-sm text-ink">
             {p.landings} décollage{p.landings > 1 ? "s" : ""} et atterrissage{p.landings > 1 ? "s" : ""} en 90 jours (3 requis)
-            {p.ok ? ` · valable jusqu'au ${frDate(p.validUntil)}` : ""}
           </p>
-          <p className="text-xs text-muted">
-            Nuit : {p.nightOk ? `✓ jusqu'au ${frDate(p.nightValidUntil)}` : "✕ 1 décollage et atterrissage de nuit en 90 jours requis (sans IR)"}
-          </p>
-        </div>
-
-        {/* Prorogation SEP */}
-        <div className={`rounded-xl border px-4 py-2.5 ${r.sep.ok ? "border-ok/30 bg-ok-soft" : "border-line bg-paper"}`}>
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-            <p className="flex flex-wrap items-baseline gap-x-2 text-[11px] font-bold tracking-wide text-muted uppercase">
-              Prorogation SEP par l&apos;expérience · FCL.740.A
-              <span className={`text-sm tracking-normal normal-case ${r.sep.ok ? "text-ok" : "text-navy-2"}`}>
-                {r.sep.ok ? "✓ Conditions remplies" : "Conditions à compléter"}
-              </span>
-              <span className="text-xs font-normal tracking-normal text-muted normal-case">
-                {r.sep.expiry ? `du ${frDate(r.sep.window.from)} au ${frDate(r.sep.window.to)}` : "sur les 12 derniers mois"}
-              </span>
+          <p className="text-xs text-muted">{p.ok ? `Valable jusqu'au ${frDate(p.validUntil)} sans nouveau vol.` : "3 décollages et atterrissages requis (seul ou avec instructeur) avant d'emmener un passager."}</p>
+          {lapl && (
+            <p className="mt-1 text-xs text-ink">
+              LAPL : 10 h CDB depuis la délivrance (FCL.105.A) :{" "}
+              {r.lapl.picSinceIssue == null ? (
+                <span className="text-muted">indiquez la date de délivrance</span>
+              ) : r.lapl.picSinceIssue >= 600 ? (
+                <b className="text-ok">✓ {hm(r.lapl.picSinceIssue)}</b>
+              ) : (
+                <b className="text-danger">✕ {hm(r.lapl.picSinceIssue)} / 10:00</b>
+              )}
             </p>
-            {sepForm}
-          </div>
-          <ul className="mt-1.5 grid gap-x-4 gap-y-1.5 sm:grid-cols-2 xl:grid-cols-4">
-            {r.sep.checks.map((c) => {
-              const pct = Math.min(100, (c.done / c.need) * 100);
-              const ok = c.done >= c.need;
-              return (
-                <li key={c.label}>
-                  <div className="flex justify-between gap-2 text-xs">
-                    <span className="truncate text-ink">{c.label}</span>
-                    <span className={`font-semibold whitespace-nowrap ${ok ? "text-ok" : "text-ink"}`}>
-                      {c.unit === "h" ? `${hm(c.done)} / ${hm(c.need)}` : `${c.done} / ${c.need}`}{ok ? " ✓" : ""}
-                    </span>
-                  </div>
-                  <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-line">
-                    <div className={`h-full rounded-full ${ok ? "bg-ok" : "bg-navy-2"}`} style={{ width: `${pct}%` }} />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="mt-1 text-[10.5px] text-muted">
-            Entraînement d&apos;1 h avec instructeur compté sur les heures en double commande ; le contrôle de compétence reste
-            l&apos;alternative. À vérifier avec votre FI / examinateur.
+          )}
+        </Card>
+
+        {/* Vol de nuit */}
+        <Card ok={n.rating && n.passengersOk} bad={false}>
+          <Title
+            label="Vol de nuit · FCL.810"
+            status={n.rating ? "✓ Qualification de nuit" : "Pas de qualification de nuit"}
+            tone={n.rating ? "ok" : "muted"}
+          />
+          {n.rating ? (
+            <>
+              <p className="text-sm text-ink">
+                Passagers de nuit :{" "}
+                {n.passengersOk ? (
+                  <b className="text-ok">✓ jusqu&apos;au {frDate(n.validUntil)}</b>
+                ) : (
+                  <b className="text-danger">✕ non autorisé</b>
+                )}
+              </p>
+              <p className="text-xs text-muted">
+                1 décollage et atterrissage de nuit en 90 jours (sans IR) · {n.landings90} en 90 j. La qualification n&apos;a pas
+                d&apos;échéance{lapl ? " ; ses privilèges suivent ceux du LAPL" : " ; elle s'exerce avec une SEP en état de validité"}.
+              </p>
+            </>
+          ) : (
+            <p className="text-xs text-muted">Cochez « Qualification vol de nuit » ci-dessus si vous l&apos;avez obtenue.</p>
+          )}
+          <p className="mt-1 text-xs text-ink">
+            Expérience de nuit : <b>{hm(n.total)}</b> · {n.landingsTotal} atterrissage{n.landingsTotal > 1 ? "s" : ""}
           </p>
-        </div>
+        </Card>
+
+        {/* Maintien des privilèges : prorogation SEP (PPL) ou expérience récente LAPL */}
+        {lapl ? (
+          <Card ok={r.lapl.ok} bad={false}>
+            <Title
+              label="Maintien des privilèges LAPL(A) · FCL.140.A"
+              status={r.lapl.ok ? "✓ Conditions remplies" : "Conditions à compléter"}
+              tone={r.lapl.ok ? "ok" : "navy"}
+              extra={`24 derniers mois, du ${frDate(r.lapl.window.from)} au ${frDate(r.lapl.window.to)}${r.lapl.ok && r.lapl.validUntil ? ` · valable jusqu'au ${frDate(r.lapl.validUntil)} sans nouveau vol` : ""}`}
+            />
+            <Checks checks={r.lapl.checks} cols="xl:grid-cols-3" />
+            <p className="mt-1 text-[10.5px] text-muted">
+              12 h comme CDB, en double ou en solo supervisé, dont 12 décollages et atterrissages et 1 h d&apos;entraînement avec un
+              instructeur, sur avion ou TMG ; ou un contrôle de compétence LAPL(A) avec un examinateur.
+            </p>
+          </Card>
+        ) : (
+          <Card ok={r.sep.ok} bad={false}>
+            <Title
+              label="Prorogation SEP par l'expérience · FCL.740.A"
+              status={r.sep.ok ? "✓ Conditions remplies" : "Conditions à compléter"}
+              tone={r.sep.ok ? "ok" : "navy"}
+              extra={r.sep.expiry ? `du ${frDate(r.sep.window.from)} au ${frDate(r.sep.window.to)} (échéance ${frDate(r.sep.expiry)})` : "sur les 12 derniers mois : indiquez l'échéance de votre SEP"}
+            />
+            <Checks checks={r.sep.checks} cols="2xl:grid-cols-4" />
+            <p className="mt-1 text-[10.5px] text-muted">
+              Dans les 12 mois avant l&apos;échéance : 12 h dont 6 h CDB, 12 décollages et atterrissages, 1 h d&apos;entraînement avec un
+              instructeur (compté sur les heures en double commande) ; sinon contrôle de compétence. À vérifier avec votre FI / examinateur.
+            </p>
+          </Card>
+        )}
       </div>
 
       {/* Par type d'appareil */}
@@ -118,5 +151,44 @@ export function RecapBand({ r, sepForm }: { r: Recap; sepForm: React.ReactNode }
         </div>
       )}
     </section>
+  );
+}
+
+function Card({ ok, bad, children }: { ok: boolean; bad: boolean; children: React.ReactNode }) {
+  return <div className={`rounded-xl border px-4 py-2.5 ${ok ? "border-ok/30 bg-ok-soft" : bad ? "border-danger/30 bg-danger-soft" : "border-line bg-paper"}`}>{children}</div>;
+}
+
+function Title({ label, status, tone, extra }: { label: string; status: string; tone: "ok" | "bad" | "navy" | "muted"; extra?: string }) {
+  const c = { ok: "text-ok", bad: "text-danger", navy: "text-navy-2", muted: "text-muted" }[tone];
+  return (
+    <p className="flex flex-wrap items-baseline gap-x-2 text-[11px] font-bold tracking-wide text-muted uppercase">
+      {label}
+      <span className={`text-sm tracking-normal normal-case ${c}`}>{status}</span>
+      {extra && <span className="text-xs font-normal tracking-normal text-muted normal-case">{extra}</span>}
+    </p>
+  );
+}
+
+function Checks({ checks, cols }: { checks: Check[]; cols: string }) {
+  return (
+    <ul className={`mt-1.5 grid gap-x-4 gap-y-1.5 sm:grid-cols-2 ${cols}`}>
+      {checks.map((c) => {
+        const pct = Math.min(100, (c.done / c.need) * 100);
+        const ok = c.done >= c.need;
+        return (
+          <li key={c.label}>
+            <div className="flex justify-between gap-2 text-xs">
+              <span className="truncate text-ink">{c.label}</span>
+              <span className={`font-semibold whitespace-nowrap ${ok ? "text-ok" : "text-ink"}`}>
+                {c.unit === "h" ? `${hm(c.done)} / ${hm(c.need)}` : `${c.done} / ${c.need}`}{ok ? " ✓" : ""}
+              </span>
+            </div>
+            <div className="mt-0.5 h-1.5 overflow-hidden rounded-full bg-line">
+              <div className={`h-full rounded-full ${ok ? "bg-ok" : "bg-navy-2"}`} style={{ width: `${pct}%` }} />
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

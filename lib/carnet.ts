@@ -93,8 +93,20 @@ function sumWindow(entries: LogEntry[], from: string, to: string): Window {
   return w;
 }
 
+export type LicenceSettings = {
+  licence_type: "PPL" | "LAPL";
+  licence_number: string | null;
+  licence_issued: string | null;
+  night_rating: boolean;
+  sep_expiry: string | null;
+};
+export const DEFAULT_LICENCE: LicenceSettings = { licence_type: "PPL", licence_number: null, licence_issued: null, night_rating: false, sep_expiry: null };
+
+export type Check = { label: string; done: number; need: number; unit: "h" | "n" };
+
 export type Recap = {
   today: string;
+  licence: LicenceSettings;
   totals: { total: number; pic: number; dual: number; instructor: number; night: number; landings: number; nightLandings: number; flights: number; sim: number };
   last90: Window;
   last12m: Window;
@@ -104,14 +116,25 @@ export type Recap = {
   sep: {
     expiry: string | null;
     window: Window;
-    checks: { label: string; done: number; need: number; unit: "h" | "n" }[];
+    checks: Check[];
     ok: boolean;
   };
+  /** LAPL(A) : expérience récente des 24 derniers mois (FCL.140.A) et emport de passagers (FCL.105.A b) */
+  lapl: {
+    window: Window;
+    checks: Check[];
+    ok: boolean;
+    validUntil: string | null;
+    picSinceIssue: number | null;
+  };
+  /** Vol de nuit : qualification (FCL.810, sans date d'échéance) et emport de passagers de nuit (FCL.060 b 1 ii) */
+  night: { rating: boolean; total: number; landings90: number; landingsTotal: number; passengersOk: boolean; validUntil: string | null };
   byType: { model: string; total: number; pic: number; landings: number; last: string | null; last90: number }[];
   lastFlight: string | null;
 };
 
-export function computeRecap(entries: LogEntry[], sepExpiry: string | null, today = iso(new Date())): Recap {
+export function computeRecap(entries: LogEntry[], licence: LicenceSettings, today = iso(new Date())): Recap {
+  const sepExpiry = licence.sep_expiry;
   const totals = { total: 0, pic: 0, dual: 0, instructor: 0, night: 0, landings: 0, nightLandings: 0, flights: 0, sim: 0 };
   for (const e of entries) {
     totals.total += e.total_min;
@@ -153,6 +176,30 @@ export function computeRecap(entries: LogEntry[], sepExpiry: string | null, toda
     { label: "Vol avec instructeur", done: w.dual, need: 60, unit: "h" },
   ];
 
+  // LAPL(A) : au cours des 24 derniers mois, 12 h de vol (CDB, ou en double / solo supervisé),
+  // dont 12 décollages et atterrissages et 1 h d'entraînement avec un instructeur
+  const laplChecks = (wd: Window): Check[] => [
+    { label: "Heures de vol", done: wd.total, need: 12 * 60, unit: "h" },
+    { label: "Décollages et atterrissages", done: wd.landings, need: 12, unit: "n" },
+    { label: "Vol avec instructeur", done: wd.dual, need: 60, unit: "h" },
+  ];
+  const lw = sumWindow(entries, addMonths(today, -24), today);
+  const lChecks = laplChecks(lw);
+  const lOk = lChecks.every((c) => c.done >= c.need);
+  // Jusqu'à quand les privilèges restent exercables sans nouveau vol (les vols anciens sortent de la fenêtre)
+  let lValid: string | null = null;
+  if (lOk) {
+    lValid = today;
+    for (let d = 1; d <= 731; d++) {
+      const day = addDays(today, d);
+      if (!laplChecks(sumWindow(entries, addMonths(day, -24), today)).every((c) => c.done >= c.need)) break;
+      lValid = day;
+    }
+  }
+  const picSinceIssue = licence.licence_issued
+    ? entries.filter((e) => e.kind === "vol" && e.flight_date >= licence.licence_issued!).reduce((a, e) => a + e.pic_min, 0)
+    : null;
+
   const types = new Map<string, Recap["byType"][number]>();
   for (const e of entries) {
     const model = (e.aircraft_model || (e.kind === "report" ? "Report antérieur" : "Non précisé")).trim();
@@ -169,6 +216,16 @@ export function computeRecap(entries: LogEntry[], sepExpiry: string | null, toda
 
   return {
     today,
+    licence,
+    lapl: { window: lw, checks: lChecks, ok: lOk, validUntil: lValid, picSinceIssue },
+    night: {
+      rating: licence.night_rating,
+      total: totals.night,
+      landings90: last90.nightLandings,
+      landingsTotal: totals.nightLandings,
+      passengersOk: !!nightValidUntil && nightValidUntil >= today,
+      validUntil: nightValidUntil,
+    },
     totals,
     last90,
     last12m,

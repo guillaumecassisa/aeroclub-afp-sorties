@@ -32,7 +32,7 @@ export async function GET() {
     supabase.from("bar_settlements").select("month, paid_at").eq("user_id", user.id),
     supabase.from("outings").select("title, departure_at, approval, status, created_at").eq("instructor_id", user.id),
     supabase.from("logbook_entries").select("*").eq("user_id", user.id).order("flight_date"),
-    supabase.from("logbook_settings").select("sep_expiry, updated_at").eq("user_id", user.id).maybeSingle(),
+    supabase.from("logbook_settings").select("licence_type, licence_number, licence_issued, night_rating, sep_expiry, updated_at").eq("user_id", user.id).maybeSingle(),
   ]);
 
   const body = {

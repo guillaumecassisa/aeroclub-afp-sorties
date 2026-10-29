@@ -112,16 +112,28 @@ export async function deleteEntry(id: string): Promise<CarnetState> {
   return { ok: "Ligne supprimée." };
 }
 
-/** Date d'échéance de la qualification de classe SEP (pour la prorogation par l'expérience) */
-export async function saveSepExpiry(_: CarnetState, fd: FormData): Promise<CarnetState> {
+/** Licence du pilote : type, numéro, délivrance, qualification de nuit, échéance SEP (PPL) */
+export async function saveLicence(_: CarnetState, fd: FormData): Promise<CarnetState> {
   const me = await requireMember();
-  const v = String(fd.get("sep_expiry") ?? "");
-  if (v && !/^\d{4}-\d{2}-\d{2}$/.test(v)) return { error: "Date invalide." };
+  const date = (k: string) => {
+    const v = String(fd.get(k) ?? "");
+    return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+  };
+  const type = fd.get("licence_type") === "LAPL" ? "LAPL" : "PPL";
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("logbook_settings")
-    .upsert({ user_id: me.id, sep_expiry: v || null, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  const { error } = await supabase.from("logbook_settings").upsert(
+    {
+      user_id: me.id,
+      licence_type: type,
+      licence_number: str(fd, "licence_number", 40)?.toUpperCase() ?? null,
+      licence_issued: date("licence_issued"),
+      night_rating: fd.get("night_rating") === "on",
+      sep_expiry: type === "PPL" ? date("sep_expiry") : null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "user_id" },
+  );
   if (error) return { error: "Enregistrement impossible : " + error.message };
   revalidatePath("/carnet");
-  return { ok: "Échéance enregistrée." };
+  return { ok: "Licence enregistrée." };
 }

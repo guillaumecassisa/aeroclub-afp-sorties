@@ -1,5 +1,5 @@
 -- =====================================================================
---  MISE À JOUR COMPLÈTE (n°2 à n°46) d'une base existante.
+--  MISE À JOUR COMPLÈTE (n°2 à n°47) d'une base existante.
 --  Peut être relancée autant de fois que nécessaire : elle n'ajoute que ce qui
 --  manque et ne modifie aucune donnée saisie sur le site.
 --  Supabase > SQL Editor > New query > coller tout le fichier > Run.
@@ -9334,6 +9334,34 @@ select 'MISE A JOUR 46 OK' as resultat,
        exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'logbook_entries' and column_name = 'sim_date') as colonne_sim_date;
 
 
+-- =====================================================================
+-- migration-47-carnet-licence.sql
+-- =====================================================================
+-- =====================================================================
+--  Mise à jour n°47 : carnet de vol — licence du pilote
+--  Type de licence (PPL(A) ou LAPL(A)), numéro, date de délivrance et
+--  qualification de vol de nuit : le récapitulatif applique les conditions
+--  de maintien des privilèges propres à chaque licence.
+--  Peut être exécutée plusieurs fois sans risque.
+--  À exécuter dans Supabase > SQL Editor > New query > Run.
+-- =====================================================================
+alter table public.logbook_settings add column if not exists licence_type text not null default 'PPL';
+alter table public.logbook_settings add column if not exists licence_number text;
+alter table public.logbook_settings add column if not exists licence_issued date;
+alter table public.logbook_settings add column if not exists night_rating boolean not null default false;
+do $$ begin
+  if not exists (select 1 from pg_constraint where conname = 'logbook_settings_licence_type_check') then
+    alter table public.logbook_settings add constraint logbook_settings_licence_type_check check (licence_type in ('PPL', 'LAPL'));
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'logbook_settings_licence_number_check') then
+    alter table public.logbook_settings add constraint logbook_settings_licence_number_check check (licence_number is null or length(licence_number) <= 40);
+  end if;
+end $$;
+
+select 'MISE A JOUR 47 OK' as resultat,
+       exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'logbook_settings' and column_name = 'licence_type') as colonne_licence;
+
+
 -- ===================== Vérification finale =====================
 notify pgrst, 'reload schema';
 select
@@ -9372,7 +9400,7 @@ select
     and exists (select 1 from pg_proc where proname = 'quiz_today_set')
     and exists (select 1 from public._seeds where name = 'quiz-flotte-35')
     and exists (select 1 from public._seeds where name = 'quiz-reglement-42')
-    and to_regclass('public.shop_stock') is not null and to_regclass('public.quiz_daily_set') is not null and exists (select 1 from pg_trigger where tgname = 'on_auth_user_deleted') and to_regclass('public.shop_settings') is not null and exists (select 1 from pg_proc where proname = 'set_outing_poster') and exists (select 1 from pg_proc where proname = 'bar_members') and to_regclass('public.flight_photos') is not null and to_regclass('public.logbook_entries') is not null and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'logbook_entries' and column_name = 'sim_date') and (select is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'outings' and column_name = 'departure_at') = 'YES'
+    and to_regclass('public.shop_stock') is not null and to_regclass('public.quiz_daily_set') is not null and exists (select 1 from pg_trigger where tgname = 'on_auth_user_deleted') and to_regclass('public.shop_settings') is not null and exists (select 1 from pg_proc where proname = 'set_outing_poster') and exists (select 1 from pg_proc where proname = 'bar_members') and to_regclass('public.flight_photos') is not null and to_regclass('public.logbook_entries') is not null and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'logbook_entries' and column_name = 'sim_date') and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'logbook_settings' and column_name = 'licence_type') and (select is_nullable from information_schema.columns where table_schema = 'public' and table_name = 'outings' and column_name = 'departure_at') = 'YES'
   as "TOUT EST A JOUR",
   (select count(*) from public.profiles) as membres,
   (select string_agg(registration, ', ' order by registration) from public.aircraft) as avions,
