@@ -52,6 +52,22 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             {profile && (
               <div className="flex items-center gap-1">
               {approved && (
+                <Link
+                  href="/carnet"
+                  aria-label="Mon carnet de vol"
+                  title="Mon carnet de vol"
+                  className="flex items-center gap-1.5 rounded-full px-2 py-1.5 text-sm font-medium whitespace-nowrap text-navy-2 hover:bg-sky-soft sm:px-3"
+                >
+                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z" />
+                    <path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3" />
+                    <path d="M9 7.5h6M9 11h6" />
+                    <path d="m12.5 14.6 2.4-1 .4-1.6.7.3-.1 1.6 1.6.7-.2.6-1.7-.3-1.3 1.3-.6-.3.6-1.4" strokeWidth="1.2" />
+                  </svg>
+                  <span className="hidden lg:inline">Carnet de vol</span>
+                </Link>
+              )}
+              {approved && (
                 <Link href="/compte" className="hidden rounded-full px-2 py-1.5 text-sm font-medium whitespace-nowrap text-navy-2 hover:bg-sky-soft sm:inline-block sm:px-3">
                   Mon compte
                 </Link>

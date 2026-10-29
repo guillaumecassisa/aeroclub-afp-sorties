@@ -29,7 +29,7 @@ documents 14 Mo, photos de profil). Largement dans les offres gratuites (500 Mo 
 
 | Dossier | Contenu |
 |---|---|
-| `app/` | Une page par rubrique (`sorties`, `pedagogie`, `bar`, `shop`, `flotte`, `quiz`, `droits`, `sauvegarde`…) ; chaque `actions.ts` contient les actions serveur de la rubrique |
+| `app/` | Une page par rubrique (`sorties`, `pedagogie`, `bar`, `shop`, `flotte`, `carnet`, `quiz`, `droits`, `sauvegarde`…) ; chaque `actions.ts` contient les actions serveur de la rubrique |
 | `components/` | Éléments d'interface partagés (formulaire d'événement, météo, quiz, avatars…) |
 | `lib/` | Droits (`auth.ts`), dates (heure de Paris), emails, masse et centrage, météo, shop, quiz |
 | `proxy.ts` | Contrôle d'accès : toute page hors connexion / inscription exige d'être connecté |
@@ -88,3 +88,4 @@ Secrets GitHub (sauvegarde nocturne uniquement, jamais dans Vercel) : `SUPABASE_
 | 42 | Quiz : questions sur le règlement intérieur de l'AFPA |
 | 43 | Bar : gestion (noms et emails des membres ayant une ardoise, pour les relances) |
 | 44 | Shareflight : photos de vol |
+| 45 | Carnet de vol personnel (vols, report d'heures, échéance SEP) |

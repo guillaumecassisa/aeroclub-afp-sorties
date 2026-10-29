@@ -52,6 +52,7 @@ migration-41-affiche-evenement.sql
 migration-42-quiz-reglement.sql
 migration-43-bar-gestion.sql
 migration-44-photos-vols.sql
+migration-45-carnet-de-vol.sql
 "
 LAST=$(echo "$MIGRATIONS" | grep . | tail -1 | sed 's/migration-\([0-9]*\).*/\1/')
 

@@ -80,6 +80,7 @@ Sortie avion : un membre non lâché sur le type d'avion n'y est placé que si u
 |---|---|---|---|---|---|---|
 | Voir la flotte et les documents des avions | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Masse et centrage, performances, préparer son vol | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Tenir son carnet de vol (vols, report d'heures, export Excel) — personne d'autre ne le voit, pas même un admin | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Ajouter, modifier, supprimer un document d'avion | — | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Flotte (maintenance) : avions, disponibilité | — | — | — | ✓ | — | ✓ |
 | Modifier les données de masse et centrage d'un avion | — | — | — | ✓ | — | ✓ |

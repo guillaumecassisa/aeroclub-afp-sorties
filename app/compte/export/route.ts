@@ -9,7 +9,7 @@ export async function GET() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.redirect(new URL("/connexion", process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"));
 
-  const [profile, weight, releases, registrations, consumptions, settlements, proposals] = await Promise.all([
+  const [profile, weight, releases, registrations, consumptions, settlements, proposals, logbook, logbookSettings] = await Promise.all([
     supabase
       .from("profiles")
       .select(
@@ -31,6 +31,8 @@ export async function GET() {
       .order("created_at"),
     supabase.from("bar_settlements").select("month, paid_at").eq("user_id", user.id),
     supabase.from("outings").select("title, departure_at, approval, status, created_at").eq("instructor_id", user.id),
+    supabase.from("logbook_entries").select("*").eq("user_id", user.id).order("flight_date"),
+    supabase.from("logbook_settings").select("sep_expiry, updated_at").eq("user_id", user.id).maybeSingle(),
   ]);
 
   const body = {
@@ -51,6 +53,7 @@ export async function GET() {
     inscriptions: registrations.data ?? [],
     evenements_organises_ou_proposes: proposals.data ?? [],
     bar: { consommations: consumptions.data ?? [], mois_regles: settlements.data ?? [] },
+    carnet_de_vol: { lignes: logbook.data ?? [], reglages: logbookSettings.data, note: "Durées en minutes." },
   };
 
   return new NextResponse(JSON.stringify(body, null, 2), {
