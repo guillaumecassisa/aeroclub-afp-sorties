@@ -20,7 +20,7 @@ export function RecapBand({ r, licenceForm }: { r: Recap; licenceForm: React.Rea
   const n = r.night;
   const lapl = r.licence.licence_type === "LAPL";
   return (
-    <section className="relative left-1/2 mb-5 w-[calc(100vw-2rem)] max-w-[1900px] -translate-x-1/2 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
+    <section className="mb-5 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
       {/* Totaux et activité récente */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-2 bg-navy-2 px-5 py-3 sm:grid-cols-3 lg:grid-cols-6">
         <Stat label="Heures totales" value={hm(r.totals.total)} sub={`dont CDB ${hm(r.totals.pic)}`} />

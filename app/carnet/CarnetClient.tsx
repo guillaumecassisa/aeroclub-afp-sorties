@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from "react";
-import { FormMessage, SubmitButton, keepValues } from "@/components/ui";
+import { useActionState, useEffect, useMemo, useState, useTransition } from "react";
+import { FormMessage, keepValues } from "@/components/ui";
 import { blockMinutes, hm, parseDuration, type LogEntry } from "@/lib/carnet";
 import { deleteEntry, saveEntry, type CarnetState } from "./actions";
 
@@ -26,12 +26,17 @@ const add = (t: Tot, e: LogEntry): Tot => ({
 });
 const plus = (a: Tot, b: Tot): Tot => Object.fromEntries(Object.keys(a).map((k) => [k, a[k as keyof Tot] + b[k as keyof Tot]])) as Tot;
 
-const TH = "border border-white/25 px-1.5 py-1 text-center align-middle font-semibold";
-const TD = "border border-line px-1.5 py-1 align-middle";
+// Largeurs des 26 colonnes (proportions) : le carnet tient dans la largeur de la page, sans défilement
+const COLS = [74, 40, 40, 40, 40, 46, 58, 37, 33, 33, 38, 52, 27, 27, 28, 34, 33, 37, 33, 34, 33, 62, 38, 33, 64, 38];
+const SUM = COLS.reduce((a, b) => a + b, 0);
+
+const TH = "border border-white/25 px-0.5 py-1 text-center align-middle font-semibold leading-tight";
+const TD = "border border-line px-[3px] py-1 align-middle overflow-hidden text-ellipsis whitespace-nowrap";
 
 export function CarnetClient({ entries, fleet, today }: { entries: LogEntry[]; fleet: Plane[]; myName: string; today: string }) {
   const [msg, setMsg] = useState<CarnetState>(undefined);
   const [editing, setEditing] = useState<string | null>(null);
+  const [mobileForm, setMobileForm] = useState<LogEntry | "new" | null>(null);
   const [pending, start] = useTransition();
 
   // Lignes du carnet dans l'ordre chronologique (toutes les heures depuis le début)
@@ -53,6 +58,7 @@ export function CarnetClient({ entries, fleet, today }: { entries: LogEntry[]; f
   const before = flights.slice(0, page * PER_PAGE).reduce(add, zero());
   const pageTot = rows.reduce(add, zero());
   const lastPage = page === pages - 1;
+  const prevArr = flights.at(-1)?.arr_place ?? null;
 
   function remove(e: LogEntry) {
     if (!window.confirm(`Supprimer la ligne du ${frDate(e.flight_date)} ?`)) return;
@@ -60,122 +66,192 @@ export function CarnetClient({ entries, fleet, today }: { entries: LogEntry[]; f
   }
   const done = (m?: CarnetState) => {
     setEditing(null);
+    setMobileForm(null);
     if (m) setMsg(m);
   };
+
+  const pager = (
+    <div className="flex flex-wrap items-center gap-1 text-sm">
+      <span className="mr-1 font-semibold text-navy-2">Page {page + 1} / {pages}</span>
+      {[
+        ["«", 0, page === 0, "Première page"],
+        ["‹", page - 1, page === 0, "Page précédente"],
+        ["›", page + 1, lastPage, "Page suivante"],
+        ["»", pages - 1, lastPage, "Dernière page"],
+      ].map(([l, p, dis, t]) => (
+        <button key={t as string} type="button" title={t as string} aria-label={t as string} disabled={dis as boolean} onClick={() => setPage(p as number)} className="rounded-full px-2.5 py-0.5 text-base text-navy-2 hover:bg-sky-soft disabled:opacity-30">
+          {l}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <section>
       <div className="mb-3"><FormMessage state={msg} /></div>
 
-      {/* Le carnet prend toute la largeur de l'écran : ses 25 colonnes restent lisibles */}
-      <div className="card relative left-1/2 w-[calc(100vw-2rem)] max-w-[1900px] -translate-x-1/2 overflow-hidden">
-        <div className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2 text-sm">
-          <span className="font-semibold text-navy-2">Page {page + 1} / {pages}</span>
-          <button type="button" className="rounded-full px-3 py-1 text-navy-2 hover:bg-sky-soft disabled:opacity-40" disabled={page === 0} onClick={() => setPage(0)}>« Première</button>
-          <button type="button" className="rounded-full px-3 py-1 text-navy-2 hover:bg-sky-soft disabled:opacity-40" disabled={page === 0} onClick={() => setPage((p) => p - 1)}>‹ Précédente</button>
-          <button type="button" className="rounded-full px-3 py-1 text-navy-2 hover:bg-sky-soft disabled:opacity-40" disabled={lastPage} onClick={() => setPage((p) => p + 1)}>Suivante ›</button>
-          <button type="button" className="rounded-full px-3 py-1 text-navy-2 hover:bg-sky-soft disabled:opacity-40" disabled={lastPage} onClick={() => setPage(pages - 1)}>Dernière »</button>
-          <span className="ml-auto text-xs text-muted">Saisie : remplissez la ligne vide en bas de la dernière page, comme sur votre carnet.</span>
+      {/* ── Ordinateur et tablette : le carnet, colonne pour colonne ── */}
+      <div className="card hidden overflow-hidden md:block">
+        <div className="flex flex-wrap items-center gap-2 border-b border-line px-3 py-1.5">
+          {pager}
+          <span className="ml-auto text-xs text-muted">Saisie dans la ligne vide en bas de la dernière page, comme sur votre carnet.</span>
         </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-max min-w-full border-collapse text-[12.5px]">
-            <thead className="bg-navy-2 text-[11px] text-white">
-              <tr>
-                <th className={TH} rowSpan={2}>Date<br /><span className="font-normal opacity-70">JJ/MM/AAAA</span></th>
-                <th className={TH} colSpan={2}>Départ</th>
-                <th className={TH} colSpan={2}>Arrivée</th>
-                <th className={TH} colSpan={2}>Aéronef</th>
-                <th className={TH} colSpan={2}><W>Temps comme pilote d&apos;aéronef mono-pilote</W></th>
-                <th className={TH} rowSpan={2}><W>Temps comme pilote d&apos;aéronef multi-pilote</W></th>
-                <th className={TH} rowSpan={2}><W>Durée totale du vol</W></th>
-                <th className={TH} rowSpan={2}><W>Nom du commandant de bord</W></th>
-                <th className={TH} colSpan={2}><W>Nombre d&apos;atterrissages</W></th>
-                <th className={TH} rowSpan={2}>IFR APCH</th>
-                <th className={TH} colSpan={2}><W>Temps en conditions opérationnelles</W></th>
-                <th className={TH} colSpan={4}><W>Temps comme pilote en fonction</W></th>
-                <th className={TH} colSpan={3}><W>Séances de simulateur</W></th>
-                <th className={TH} rowSpan={2}><W>Remarques et appositions</W></th>
-                <th className={TH} rowSpan={2} />
-              </tr>
-              <tr>
-                {["Lieu", "Heure", "Lieu", "Heure", "Modèle", "Immat", "SE", "ME", "Jour", "Nuit", "Nuit", "IFR", "CDB", "COPI", "DC", "INST", "Date", "Type", "Durée"].map((h, i) => (
-                  <th key={i} className={TH}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((e) =>
-                editing === e.id ? (
-                  <EntryRow key={e.id} entry={e} fleet={fleet} mine={mine} today={today} prevArr={null} onDone={done} />
-                ) : (
-                  <tr key={e.id} className="hover:bg-sky-soft/40">
-                    <td className={`${TD} whitespace-nowrap`}>{frDate(e.flight_date)}</td>
-                    <td className={`${TD} font-semibold`}>{e.dep_place}</td>
-                    <td className={`${TD} text-center tabular-nums`}>{t5(e.dep_time)}</td>
-                    <td className={`${TD} font-semibold`}>{e.arr_place}</td>
-                    <td className={`${TD} text-center tabular-nums`}>{t5(e.arr_time)}</td>
-                    <td className={TD}>{e.aircraft_model}</td>
-                    <td className={`${TD} whitespace-nowrap`}>{e.aircraft_reg}</td>
-                    <Num v={dur(e.se_min)} /><Num v={dur(e.me_min)} /><Num v={dur(e.multi_pilot_min)} />
-                    <Num v={dur(e.total_min)} bold />
-                    <td className={`${TD} whitespace-nowrap`}>{e.pic_name}</td>
-                    <Num v={n0(e.landings_day)} /><Num v={n0(e.landings_night)} /><Num v={n0(e.ifr_approaches)} />
-                    <Num v={dur(e.night_min)} /><Num v={dur(e.ifr_min)} />
-                    <Num v={dur(e.pic_min)} /><Num v={dur(e.copilot_min)} /><Num v={dur(e.dual_min)} /><Num v={dur(e.instructor_min)} />
-                    <td className={`${TD} whitespace-nowrap`}>{frDate(e.sim_date)}</td>
-                    <td className={TD}>{e.sim_type}</td>
-                    <Num v={dur(e.sim_min)} />
-                    <td className={`${TD} max-w-64 min-w-40`}>{e.remarks}</td>
-                    <td className={`${TD} whitespace-nowrap`}>
-                      <button type="button" onClick={() => { setMsg(undefined); setEditing(e.id); }} className="mr-2 text-xs text-sky hover:underline">Modifier</button>
-                      <button type="button" onClick={() => remove(e)} disabled={pending} className="text-xs text-danger hover:underline">Suppr.</button>
-                    </td>
-                  </tr>
-                ),
-              )}
-              {lastPage && !editing && (
-                <EntryRow key={`new-${flights.length}`} entry={null} fleet={fleet} mine={mine} today={today} prevArr={flights.at(-1)?.arr_place ?? null} onDone={done} />
-              )}
-              {/* lignes vides pour garder l'aspect de la page */}
-              {Array.from({ length: Math.max(0, PER_PAGE - rows.length - (lastPage && !editing ? 1 : 0)) }).map((_, i) => (
-                <tr key={`vide-${i}`} className="h-7">{Array.from({ length: 26 }).map((__, j) => <td key={j} className={TD} />)}</tr>
+        <table className="w-full table-fixed border-collapse text-[11px]">
+          <colgroup>
+            {COLS.map((w, i) => <col key={i} style={{ width: `${(w / SUM) * 100}%` }} />)}
+          </colgroup>
+          <thead className="bg-navy-2 text-[9.5px] text-white">
+            <tr>
+              <th className={TH} rowSpan={2}>Date</th>
+              <th className={TH} colSpan={2}>Départ</th>
+              <th className={TH} colSpan={2}>Arrivée</th>
+              <th className={TH} colSpan={2}>Aéronef</th>
+              <th className={TH} colSpan={2}>Temps comme pilote d&apos;aéronef mono-pilote</th>
+              <th className={TH} rowSpan={2}>Temps pilote multi-pilote</th>
+              <th className={TH} rowSpan={2}>Durée totale du vol</th>
+              <th className={TH} rowSpan={2}>Nom du CDB</th>
+              <th className={TH} colSpan={2}>Atterris&shy;sages</th>
+              <th className={TH} rowSpan={2}>IFR APCH</th>
+              <th className={TH} colSpan={2}>Conditions opération.</th>
+              <th className={TH} colSpan={4}>Temps comme pilote en fonction</th>
+              <th className={TH} colSpan={3}>Séances de simulateur</th>
+              <th className={TH} rowSpan={2}>Remarques et appositions</th>
+              <th className={TH} rowSpan={2} />
+            </tr>
+            <tr>
+              {["Lieu", "Heure", "Lieu", "Heure", "Modèle", "Immat", "SE", "ME", "Jour", "Nuit", "Nuit", "IFR", "CDB", "COPI", "DC", "INST", "Date", "Type", "Durée"].map((h, i) => (
+                <th key={i} className={TH}>{h}</th>
               ))}
-            </tbody>
-            <tfoot className="text-[12px] font-semibold">
-              <TotRow label="TOTAL DE LA PAGE" t={pageTot} />
-              <TotRow label="TOTAL DES PAGES PRÉCÉDENTES" t={before} muted />
-              <TotRow label="TOTAL" t={plus(before, pageTot)} strong />
-            </tfoot>
-          </table>
-        </div>
-        <p className="border-t border-line px-4 py-2 text-xs text-muted">
-          Je certifie que les informations de ce carnet sont exactes. · Durées au format HH:MM (1:35). La durée totale se calcule depuis les
-          heures bloc et se reporte en SE et en CDB : déplacez-la en DC pour un vol en double commande.
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((e) =>
+              editing === e.id ? (
+                <EntryRow key={e.id} entry={e} fleet={fleet} mine={mine} today={today} prevArr={null} onDone={done} />
+              ) : (
+                <tr key={e.id} className="hover:bg-sky-soft/40">
+                  <td className={`${TD} tabular-nums`}>{frDate(e.flight_date)}</td>
+                  <td className={`${TD} font-semibold`}>{e.dep_place}</td>
+                  <td className={`${TD} text-center tabular-nums`}>{t5(e.dep_time)}</td>
+                  <td className={`${TD} font-semibold`}>{e.arr_place}</td>
+                  <td className={`${TD} text-center tabular-nums`}>{t5(e.arr_time)}</td>
+                  <td className={TD} title={e.aircraft_model ?? undefined}>{e.aircraft_model}</td>
+                  <td className={TD}>{e.aircraft_reg}</td>
+                  <Num v={dur(e.se_min)} /><Num v={dur(e.me_min)} /><Num v={dur(e.multi_pilot_min)} />
+                  <Num v={dur(e.total_min)} bold />
+                  <td className={TD} title={e.pic_name ?? undefined}>{e.pic_name}</td>
+                  <Num v={n0(e.landings_day)} /><Num v={n0(e.landings_night)} /><Num v={n0(e.ifr_approaches)} />
+                  <Num v={dur(e.night_min)} /><Num v={dur(e.ifr_min)} />
+                  <Num v={dur(e.pic_min)} /><Num v={dur(e.copilot_min)} /><Num v={dur(e.dual_min)} /><Num v={dur(e.instructor_min)} />
+                  <td className={`${TD} tabular-nums`}>{frDate(e.sim_date)}</td>
+                  <td className={TD}>{e.sim_type}</td>
+                  <Num v={dur(e.sim_min)} />
+                  <td className={TD} title={e.remarks ?? undefined}>{e.remarks}</td>
+                  <td className={`${TD} text-center whitespace-nowrap`}>
+                    <button type="button" title="Modifier" aria-label="Modifier" onClick={() => { setMsg(undefined); setEditing(e.id); }} className="px-0.5 text-sky hover:opacity-70">✎</button>
+                    <button type="button" title="Supprimer" aria-label="Supprimer" onClick={() => remove(e)} disabled={pending} className="px-0.5 text-danger hover:opacity-70">✕</button>
+                  </td>
+                </tr>
+              ),
+            )}
+            {lastPage && !editing && (
+              <EntryRow key={`new-${flights.length}`} entry={null} fleet={fleet} mine={mine} today={today} prevArr={prevArr} onDone={done} />
+            )}
+            {/* lignes vides pour garder l'aspect de la page */}
+            {Array.from({ length: Math.max(0, PER_PAGE - rows.length - (lastPage && !editing ? 1 : 0)) }).map((_, i) => (
+              <tr key={`vide-${i}`} className="h-6">{COLS.map((__, j) => <td key={j} className={TD} />)}</tr>
+            ))}
+          </tbody>
+          <tfoot className="text-[10.5px] font-semibold">
+            <TotRow label="TOTAL DE LA PAGE" t={pageTot} />
+            <TotRow label="TOTAL DES PAGES PRÉCÉDENTES" t={before} muted />
+            <TotRow label="TOTAL" t={plus(before, pageTot)} strong />
+          </tfoot>
+        </table>
+        <p className="border-t border-line px-3 py-1.5 text-[11px] text-muted">
+          Je certifie que les informations de ce carnet sont exactes. · Dates JJ/MM/AAAA, heures et durées HH:MM. La durée totale se
+          calcule depuis les heures bloc et se reporte en SE et en CDB : déplacez-la en DC pour un vol en double commande.
         </p>
       </div>
 
+      {/* ── Téléphone : une fiche par vol, et la saisie par rubriques du carnet ── */}
+      <div className="md:hidden">
+        {mobileForm ? (
+          <EntryCard
+            key={mobileForm === "new" ? "new" : mobileForm.id}
+            entry={mobileForm === "new" ? null : mobileForm}
+            fleet={fleet}
+            mine={mine}
+            today={today}
+            prevArr={prevArr}
+            onDone={done}
+          />
+        ) : (
+          <button type="button" className="btn-primary mb-3 w-full" onClick={() => { setMsg(undefined); setMobileForm("new"); }}>
+            ＋ Ajouter un vol
+          </button>
+        )}
+        <div className="card overflow-hidden">
+          <div className="border-b border-line px-3 py-1.5">{pager}</div>
+          {rows.length === 0 ? (
+            <p className="p-4 text-center text-sm text-muted">Aucun vol sur cette page.</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {[...rows].reverse().map((e) => (
+                <li key={e.id} className="px-3 py-2.5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="font-semibold text-ink">
+                      {e.dep_place ?? "?"} <span className="text-muted">{t5(e.dep_time)}</span> → {e.arr_place ?? "?"} <span className="text-muted">{t5(e.arr_time)}</span>
+                    </span>
+                    <span className="font-bold tabular-nums text-navy-2">{hm(e.total_min)}</span>
+                  </div>
+                  <p className="text-xs text-muted">
+                    {frDate(e.flight_date)} · {[e.aircraft_model, e.aircraft_reg].filter(Boolean).join(" ")} · {[
+                      e.pic_min && `CDB ${hm(e.pic_min)}`,
+                      e.dual_min && `DC ${hm(e.dual_min)}`,
+                      e.instructor_min && `INST ${hm(e.instructor_min)}`,
+                      e.copilot_min && `COPI ${hm(e.copilot_min)}`,
+                    ].filter(Boolean).join(" · ")} · {e.landings_day + e.landings_night} att.{e.night_min ? ` · nuit ${hm(e.night_min)}` : ""}
+                  </p>
+                  {(e.pic_name || e.remarks) && <p className="truncate text-xs text-muted">{[e.pic_name, e.remarks].filter(Boolean).join(" · ")}</p>}
+                  <div className="mt-1 flex gap-4">
+                    <button type="button" onClick={() => { setMsg(undefined); setMobileForm(e); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="text-xs text-sky hover:underline">Modifier</button>
+                    <button type="button" onClick={() => remove(e)} disabled={pending} className="text-xs text-danger hover:underline">Supprimer</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <dl className="grid grid-cols-3 gap-2 border-t border-line bg-paper px-3 py-2 text-center text-xs">
+            <MobTot label="Page" t={pageTot} />
+            <MobTot label="Pages précédentes" t={before} />
+            <MobTot label="Total" t={plus(before, pageTot)} strong />
+          </dl>
+        </div>
+      </div>
     </section>
   );
 }
 
-/** En-tête sur plusieurs lignes (comme sur le carnet papier) */
-function W({ children }: { children: React.ReactNode }) {
-  return <div className="mx-auto w-[84px] leading-tight whitespace-normal">{children}</div>;
+function MobTot({ label, t, strong }: { label: string; t: Tot; strong?: boolean }) {
+  return (
+    <div>
+      <dt className="text-[10px] font-semibold text-muted uppercase">{label}</dt>
+      <dd className={`font-bold tabular-nums ${strong ? "text-navy-2" : "text-ink"}`}>{hm(t.total)}</dd>
+      <dd className="text-[10px] text-muted">CDB {hm(t.pic)} · {t.ld + t.ln} att.</dd>
+    </div>
+  );
 }
 
 function Num({ v, bold }: { v: string; bold?: boolean }) {
   return <td className={`${TD} text-right tabular-nums ${bold ? "font-bold" : ""}`}>{v}</td>;
 }
 
-function TotRow({ label, t, muted, strong, note }: { label: string; t: Tot; muted?: boolean; strong?: boolean; note?: string }) {
+function TotRow({ label, t, muted, strong }: { label: string; t: Tot; muted?: boolean; strong?: boolean }) {
   const c = `${TD} text-right tabular-nums ${strong ? "bg-sky-soft text-navy-2" : muted ? "bg-paper text-muted" : "bg-paper"}`;
   return (
     <tr>
-      <td className={`${TD} text-right ${strong ? "bg-sky-soft text-navy-2" : "bg-paper"}`} colSpan={7}>
-        {label}
-        {note && <span className="block text-[10px] font-normal">{note}</span>}
-      </td>
+      <td className={`${TD} text-right ${strong ? "bg-sky-soft text-navy-2" : "bg-paper"}`} colSpan={7}>{label}</td>
       <td className={c}>{hm(t.se)}</td><td className={c}>{hm(t.me)}</td><td className={c}>{hm(t.mp)}</td><td className={c}>{hm(t.total)}</td>
       <td className={c} />
       <td className={c}>{t.ld}</td><td className={c}>{t.ln}</td><td className={c}>{t.apch}</td>
@@ -187,14 +263,24 @@ function TotRow({ label, t, muted, strong, note }: { label: string; t: Tot; mute
   );
 }
 
-const IN = "min-w-0 rounded border border-line bg-white px-1 py-0.5 text-[12.5px] focus:border-navy-2 focus:outline-none";
+// ── Saisie d'une ligne : état partagé par la ligne du tableau et la fiche du téléphone ──────
 
-/** Une ligne du carnet en saisie : mêmes colonnes que le carnet */
-function EntryRow({ entry, fleet, mine, today, prevArr, onDone }: { entry: LogEntry | null; fleet: Plane[]; mine: Plane[]; today: string; prevArr: string | null; onDone: (m?: CarnetState) => void }) {
+type Values = {
+  flight_date: string; dep_place: string; dep_time: string; arr_place: string; arr_time: string; aircraft_model: string; aircraft_reg: string;
+  se: string; me: string; multi_pilot: string; total: string; pic_name: string; landings_day: string; landings_night: string; ifr_approaches: string;
+  night: string; ifr: string; pic: string; copilot: string; dual: string; instructor: string; sim_date: string; sim_type: string; sim: string; remarks: string;
+};
+type EntryProps = { entry: LogEntry | null; fleet: Plane[]; mine: Plane[]; today: string; prevArr: string | null; onDone: (m?: CarnetState) => void };
+
+/** « 1410 » -> « 14:10 » pendant la frappe */
+const maskTime = (s: string) => {
+  const d = s.replace(/\D/g, "").slice(0, 4);
+  return d.length > 2 ? `${d.slice(0, 2)}:${d.slice(2)}` : d;
+};
+
+function useEntry({ entry, fleet, mine, today, prevArr, onDone }: EntryProps) {
   const [state, action] = useActionState<CarnetState, FormData>(saveEntry, undefined);
-  const formId = `ligne-${entry?.id ?? "nouvelle"}`;
-  const form = useRef<HTMLFormElement>(null);
-  const [v, setV] = useState(() => ({
+  const [v, setV] = useState<Values>(() => ({
     flight_date: entry?.flight_date ?? today,
     dep_place: entry?.dep_place ?? prevArr ?? "",
     dep_time: t5(entry?.dep_time ?? null),
@@ -225,20 +311,28 @@ function EntryRow({ entry, fleet, mine, today, prevArr, onDone }: { entry: LogEn
   const [follow, setFollow] = useState<Record<string, boolean>>(() => (entry ? {} : { se: true, pic: true }) as Record<string, boolean>);
   const [totalTouched, setTotalTouched] = useState(!!entry);
 
-  const set = (k: keyof typeof v, val: string) => {
+  const set = (k: keyof Values, val: string) => {
+    if (k === "dep_time" || k === "arr_time") val = maskTime(val);
+    if (k === "dep_place" || k === "arr_place") val = val.toUpperCase();
+    if (k === "total") setTotalTouched(true);
     setV((o) => {
       const n = { ...o, [k]: val };
       if (k === "total") for (const f of Object.keys(follow)) if (follow[f]) (n as Record<string, string>)[f] = val;
       return n;
     });
-    if (k in follow && k !== "total") setFollow((f) => ({ ...f, [k]: false }));
+    if (k in follow) setFollow((f) => ({ ...f, [k]: false }));
   };
 
   // Durée totale depuis les heures bloc
   useEffect(() => {
     if (totalTouched) return;
     const m = blockMinutes(v.dep_time, v.arr_time);
-    if (m != null && hm(m) !== v.total) set("total", hm(m));
+    if (m != null && v.dep_time.length === 5 && v.arr_time.length === 5 && hm(m) !== v.total)
+      setV((o) => {
+        const n = { ...o, total: hm(m) };
+        for (const f of Object.keys(follow)) if (follow[f]) (n as Record<string, string>)[f] = hm(m);
+        return n;
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [v.dep_time, v.arr_time, totalTouched]);
 
@@ -250,123 +344,209 @@ function EntryRow({ entry, fleet, mine, today, prevArr, onDone }: { entry: LogEn
   const known = [...fleet, ...mine];
   const [other, setOther] = useState(() => !!entry?.aircraft_reg && !known.some((p) => p.registration === entry.aircraft_reg));
   const pickReg = (val: string) => {
+    if (val === "__autre") {
+      setOther(true);
+      setV((o) => ({ ...o, aircraft_reg: "" }));
+      return;
+    }
     const r = val.toUpperCase();
     const f = known.find((p) => p.registration === r);
     setV((o) => ({ ...o, aircraft_reg: r, aircraft_model: f ? f.model || o.aircraft_model : o.aircraft_model }));
   };
   const bad = (s: string) => parseDuration(s) == null;
-  const inp = (k: keyof typeof v, o: { w: string; ph?: string; up?: boolean; time?: boolean; num?: boolean; d?: boolean }) => (
-    <td className={`${TD} bg-wait-soft/60 p-0.5`}>
+  return { state, action, v, set, other, setOther, pickReg, bad };
+}
+
+const IN = "w-full min-w-0 rounded border border-line bg-white px-0.5 py-0.5 text-[11px] focus:border-navy-2 focus:outline-none";
+const DUR = new Set<keyof Values>(["se", "me", "multi_pilot", "total", "night", "ifr", "pic", "copilot", "dual", "instructor", "sim"]);
+
+/** Date JJ/MM/AAAA tapée au clavier (compacte), envoyée au format AAAA-MM-JJ */
+function DateText({ value, onChange, form, name, required }: { value: string; onChange: (iso: string) => void; form?: string; name: string; required?: boolean }) {
+  const [txt, setTxt] = useState(value ? frDate(value) : "");
+  const ok = !txt || /^\d{2}\/\d{2}\/\d{4}$/.test(txt);
+  return (
+    <>
+      <input type="hidden" form={form} name={name} value={value} />
+      <input
+        inputMode="numeric"
+        placeholder="JJ/MM/AAAA"
+        required={required}
+        value={txt}
+        onChange={(e) => {
+          const d = e.target.value.replace(/\D/g, "").slice(0, 8);
+          const t = [d.slice(0, 2), d.slice(2, 4), d.slice(4)].filter(Boolean).join("/");
+          setTxt(t);
+          const m = t.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+          onChange(m ? `${m[3]}-${m[2]}-${m[1]}` : "");
+        }}
+        className={`${IN} tabular-nums ${ok ? "" : "border-danger text-danger"}`}
+      />
+    </>
+  );
+}
+
+function RegField({ h, fleet, mine, form, className }: { h: ReturnType<typeof useEntry>; fleet: Plane[]; mine: Plane[]; form?: string; className: string }) {
+  if (h.other)
+    return (
+      <span className="flex items-center gap-0.5">
+        <input form={form} name="aircraft_reg" autoFocus value={h.v.aircraft_reg} onChange={(e) => h.pickReg(e.target.value)} placeholder="F-GXXX" maxLength={20} className={`${className} uppercase`} />
+        <button type="button" title="Choisir dans la liste" onClick={() => h.setOther(false)} className="text-[10px] text-sky hover:underline">liste</button>
+      </span>
+    );
+  return (
+    <>
+      <input type="hidden" form={form} name="aircraft_reg" value={h.v.aircraft_reg} />
+      <select value={h.v.aircraft_reg} onChange={(e) => h.pickReg(e.target.value)} className={className}>
+        <option value="">—</option>
+        <optgroup label="Avions du club">
+          {fleet.map((p) => <option key={p.registration} value={p.registration}>{p.registration} · {p.model}</option>)}
+        </optgroup>
+        {mine.length > 0 && (
+          <optgroup label="Mes autres avions">
+            {mine.map((p) => <option key={p.registration} value={p.registration}>{p.registration}{p.model ? ` · ${p.model}` : ""}</option>)}
+          </optgroup>
+        )}
+        <option value="__autre">＋ Autre immatriculation…</option>
+      </select>
+    </>
+  );
+}
+
+/** Une ligne du carnet en saisie : mêmes colonnes que le carnet */
+function EntryRow(props: EntryProps) {
+  const h = useEntry(props);
+  const { entry, fleet, mine, onDone } = props;
+  const formId = `ligne-${entry?.id ?? "nouvelle"}`;
+  const cell = `${TD} bg-wait-soft/60 p-0.5`;
+  const inp = (k: keyof Values, ph?: string) => (
+    <td className={cell}>
       <input
         form={formId}
         name={k}
-        value={v[k]}
-        type={o.time ? "time" : o.num ? "number" : "text"}
-        min={o.num ? 0 : undefined}
-        placeholder={o.ph}
-        onChange={(e) => (k === "aircraft_reg" ? pickReg(e.target.value) : (k === "total" && setTotalTouched(true), set(k, o.up ? e.target.value.toUpperCase() : e.target.value)))}
-        className={`${IN} ${o.w} ${o.d ? "text-right tabular-nums" : ""} ${o.d && bad(v[k]) ? "border-danger text-danger" : ""}`}
+        value={h.v[k]}
+        inputMode={DUR.has(k) || k.includes("time") || k.startsWith("landings") || k === "ifr_approaches" ? "numeric" : undefined}
+        placeholder={ph}
+        onChange={(e) => h.set(k, e.target.value)}
+        className={`${IN} ${DUR.has(k) ? "text-right tabular-nums" : ""} ${k === "total" ? "font-bold" : ""} ${DUR.has(k) && h.bad(h.v[k]) ? "border-danger text-danger" : ""}`}
       />
     </td>
   );
-
   return (
     <>
       <tr>
-        <td className={`${TD} bg-wait-soft/60 p-0.5`}>
-          <form id={formId} ref={form} onSubmit={keepValues(action)} className="contents">
+        <td className={cell}>
+          <form id={formId} onSubmit={keepValues(h.action)} className="contents">
             <input type="hidden" name="id" value={entry?.id ?? ""} />
             <input type="hidden" name="kind" value="vol" />
           </form>
-          <input form={formId} type="date" name="flight_date" required max={today} value={v.flight_date} onChange={(e) => set("flight_date", e.target.value)} className={`${IN} w-32`} />
+          <DateText form={formId} name="flight_date" required value={h.v.flight_date} onChange={(iso) => h.set("flight_date", iso)} />
         </td>
-        {inp("dep_place", { w: "w-16", ph: "LFMA", up: true })}
-        {inp("dep_time", { w: "w-[86px]", time: true })}
-        {inp("arr_place", { w: "w-16", ph: "LFMA", up: true })}
-        {inp("arr_time", { w: "w-[86px]", time: true })}
-        {inp("aircraft_model", { w: "w-20", ph: "DR400" })}
-        {other ? (
-          <td className={`${TD} bg-wait-soft/60 p-0.5 whitespace-nowrap`}>
-            <input
-              form={formId}
-              name="aircraft_reg"
-              autoFocus={!entry}
-              value={v.aircraft_reg}
-              onChange={(e) => pickReg(e.target.value)}
-              placeholder="F-GXXX"
-              className={`${IN} w-20 uppercase`}
-              maxLength={20}
-            />
-            <button type="button" title="Choisir dans la liste" onClick={() => setOther(false)} className="ml-0.5 text-xs text-sky hover:underline">liste</button>
-          </td>
-        ) : (
-          <td className={`${TD} bg-wait-soft/60 p-0.5`}>
-            <input type="hidden" form={formId} name="aircraft_reg" value={v.aircraft_reg} />
-            <select
-              value={v.aircraft_reg}
-              onChange={(e) => {
-                if (e.target.value === "__autre") {
-                  setOther(true);
-                  setV((o) => ({ ...o, aircraft_reg: "" }));
-                } else pickReg(e.target.value);
-              }}
-              className={`${IN} w-28`}
-            >
-              <option value="">—</option>
-              <optgroup label="Avions du club">
-                {fleet.map((p) => <option key={p.registration} value={p.registration}>{p.registration} · {p.model}</option>)}
-              </optgroup>
-              {mine.length > 0 && (
-                <optgroup label="Mes autres avions">
-                  {mine.map((p) => <option key={p.registration} value={p.registration}>{p.registration}{p.model ? ` · ${p.model}` : ""}</option>)}
-                </optgroup>
-              )}
-              <option value="__autre">＋ Autre immatriculation…</option>
-            </select>
-          </td>
-        )}
-        {inp("se", { w: "w-14", d: true })}
-        {inp("me", { w: "w-14", d: true })}
-        {inp("multi_pilot", { w: "w-14", d: true })}
-        {inp("total", { w: "w-14 font-bold", d: true, ph: "1:35" })}
-        {inp("pic_name", { w: "w-28" })}
-        {inp("landings_day", { w: "w-12", num: true })}
-        {inp("landings_night", { w: "w-12", num: true })}
-        {inp("ifr_approaches", { w: "w-12", num: true })}
-        {inp("night", { w: "w-14", d: true })}
-        {inp("ifr", { w: "w-14", d: true })}
-        {inp("pic", { w: "w-14", d: true })}
-        {inp("copilot", { w: "w-14", d: true })}
-        {inp("dual", { w: "w-14", d: true })}
-        {inp("instructor", { w: "w-14", d: true })}
-        <td className={`${TD} bg-wait-soft/60 p-0.5`}>
-          <input form={formId} type="date" name="sim_date" value={v.sim_date} onChange={(e) => set("sim_date", e.target.value)} className={`${IN} w-32`} />
-        </td>
-        {inp("sim_type", { w: "w-20" })}
-        {inp("sim", { w: "w-14", d: true })}
-        {inp("remarks", { w: "w-56", ph: "Nav, tours de piste…" })}
-        <td className={`${TD} bg-wait-soft/60 whitespace-nowrap`}>
-          <SaveButton formId={formId} label={entry ? "OK" : "Ajouter"} />
-          {entry && (
-            <button type="button" onClick={() => onDone()} className="ml-2 text-xs text-muted hover:underline">Annuler</button>
-          )}
+        {inp("dep_place", "LFMA")}
+        {inp("dep_time", "HH:MM")}
+        {inp("arr_place", "LFMA")}
+        {inp("arr_time", "HH:MM")}
+        {inp("aircraft_model", "DR400")}
+        <td className={cell}><RegField h={h} fleet={fleet} mine={mine} form={formId} className={IN} /></td>
+        {inp("se")}
+        {inp("me")}
+        {inp("multi_pilot")}
+        {inp("total", "1:35")}
+        {inp("pic_name")}
+        {inp("landings_day")}
+        {inp("landings_night")}
+        {inp("ifr_approaches")}
+        {inp("night")}
+        {inp("ifr")}
+        {inp("pic")}
+        {inp("copilot")}
+        {inp("dual")}
+        {inp("instructor")}
+        <td className={cell}><DateText form={formId} name="sim_date" value={h.v.sim_date} onChange={(iso) => h.set("sim_date", iso)} /></td>
+        {inp("sim_type")}
+        {inp("sim")}
+        {inp("remarks", "Nav, TDP…")}
+        <td className={`${cell} text-center`}>
+          <button type="submit" form={formId} title={entry ? "Enregistrer" : "Ajouter au carnet"} className="w-full rounded bg-navy-2 px-0.5 py-0.5 text-[10.5px] font-semibold text-white hover:opacity-90">
+            {entry ? "OK" : "＋"}
+          </button>
+          {entry && <button type="button" title="Annuler" onClick={() => onDone()} className="text-[10px] text-muted hover:underline">annuler</button>}
         </td>
       </tr>
-      {state?.error && (
+      {h.state?.error && (
         <tr>
-          <td colSpan={26} className="border border-line bg-danger-soft px-3 py-1.5 text-sm text-danger">{state.error}</td>
+          <td colSpan={26} className="border border-line bg-danger-soft px-3 py-1.5 text-sm text-danger">{h.state.error}</td>
         </tr>
       )}
     </>
   );
 }
 
-function SaveButton({ formId, label }: { formId: string; label: string }) {
+/** Téléphone : la même ligne du carnet, rubrique par rubrique */
+function EntryCard(props: EntryProps) {
+  const h = useEntry(props);
+  const { entry, fleet, mine, onDone, today } = props;
+  const F = "field px-2 py-1.5 text-sm";
+  const f = (k: keyof Values, label: string, ph?: string) => (
+    <label className="block min-w-0">
+      <span className="text-[11px] font-semibold text-muted">{label}</span>
+      <input
+        name={k}
+        value={h.v[k]}
+        inputMode={DUR.has(k) || k.includes("time") || k.startsWith("landings") || k === "ifr_approaches" ? "numeric" : undefined}
+        placeholder={ph}
+        onChange={(e) => h.set(k, e.target.value)}
+        className={`${F} ${k === "total" ? "font-bold" : ""} ${DUR.has(k) && h.bad(h.v[k]) ? "border-danger text-danger" : ""}`}
+      />
+    </label>
+  );
+  // Rubrique du carnet (fonction, pas composant : les champs ne perdent pas le focus)
+  const G = (title: string, cols: string, children: React.ReactNode) => (
+    <fieldset className="rounded-lg border border-line p-2.5">
+      <legend className="px-1 text-xs font-bold text-navy-2">{title}</legend>
+      <div className={`grid gap-2 ${cols}`}>{children}</div>
+    </fieldset>
+  );
   return (
-    <button type="submit" form={formId} className="rounded-full bg-navy-2 px-3 py-1 text-xs font-semibold text-white hover:opacity-90">
-      {label}
-    </button>
+    <form onSubmit={keepValues(h.action)} className="card mb-3 space-y-2.5 p-3">
+      <input type="hidden" name="id" value={entry?.id ?? ""} />
+      <input type="hidden" name="kind" value="vol" />
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold text-navy-2">{entry ? "Modifier le vol" : "Nouveau vol"}</h3>
+        <button type="button" onClick={() => onDone()} className="text-sm text-muted hover:underline">Fermer</button>
+      </div>
+      <label className="block">
+        <span className="text-[11px] font-semibold text-muted">Date</span>
+        <input type="date" name="flight_date" required max={today} value={h.v.flight_date} onChange={(e) => h.set("flight_date", e.target.value)} className={F} />
+      </label>
+      {G("Départ", "grid-cols-2", <>{f("dep_place", "Lieu", "LFMA")}{f("dep_time", "Heure", "HH:MM")}</>)}
+      {G("Arrivée", "grid-cols-2", <>{f("arr_place", "Lieu", "LFMA")}{f("arr_time", "Heure", "HH:MM")}</>)}
+      {G("Aéronef", "grid-cols-2", <>
+        <label className="block min-w-0">
+          <span className="text-[11px] font-semibold text-muted">Immat</span>
+          <RegField h={h} fleet={fleet} mine={mine} className={`${F} w-full`} />
+        </label>
+        {f("aircraft_model", "Modèle", "DR400")}
+      </>)}
+      {G("Temps de vol", "grid-cols-4", <>
+        {f("se", "SE")}{f("me", "ME")}{f("multi_pilot", "Multi-pil.")}{f("total", "Total", "1:35")}
+      </>)}
+      {f("pic_name", "Nom du commandant de bord")}
+      {G("Atterrissages", "grid-cols-3", <>{f("landings_day", "Jour")}{f("landings_night", "Nuit")}{f("ifr_approaches", "IFR APCH")}</>)}
+      {G("Conditions opérationnelles", "grid-cols-2", <>{f("night", "Nuit")}{f("ifr", "IFR")}</>)}
+      {G("Temps comme pilote en fonction", "grid-cols-4", <>{f("pic", "CDB")}{f("copilot", "COPI")}{f("dual", "DC")}{f("instructor", "INST")}</>)}
+      <details className="rounded-lg border border-line p-2.5">
+        <summary className="cursor-pointer text-xs font-bold text-navy-2">Séance de simulateur</summary>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          <label className="block min-w-0">
+            <span className="text-[11px] font-semibold text-muted">Date</span>
+            <input type="date" name="sim_date" value={h.v.sim_date} onChange={(e) => h.set("sim_date", e.target.value)} className={F} />
+          </label>
+          {f("sim_type", "Type")}{f("sim", "Durée")}
+        </div>
+      </details>
+      {f("remarks", "Remarques et appositions", "Nav, tours de piste…")}
+      {h.state?.error && <p className="rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger">{h.state.error}</p>}
+      <button type="submit" className="btn-primary w-full">{entry ? "Enregistrer" : "Ajouter au carnet"}</button>
+    </form>
   );
 }
-
-
