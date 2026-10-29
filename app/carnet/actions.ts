@@ -21,7 +21,7 @@ const time = (fd: FormData, k: string) => {
 export async function saveEntry(_: CarnetState, fd: FormData): Promise<CarnetState> {
   await requireMember();
   const id = String(fd.get("id") ?? "") || null;
-  const kind = fd.get("kind") === "report" ? "report" : "vol";
+  const kind = String(fd.get("kind") ?? "") === "report" && id ? "report" : "vol"; // nouvelles lignes : toujours des vols (tout le carnet depuis le début)
   const date = String(fd.get("flight_date") ?? "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { error: "Date invalide." };
   if (kind === "vol" && date > new Date(Date.now() + 86400000).toISOString().slice(0, 10)) return { error: "La date du vol est dans le futur." };

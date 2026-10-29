@@ -32,28 +32,25 @@ const TD = "border border-line px-1.5 py-1 align-middle";
 export function CarnetClient({ entries, fleet, today }: { entries: LogEntry[]; fleet: Plane[]; myName: string; today: string }) {
   const [msg, setMsg] = useState<CarnetState>(undefined);
   const [editing, setEditing] = useState<string | null>(null);
-  const [report, setReport] = useState<LogEntry | "new" | null>(null);
   const [pending, start] = useTransition();
 
-  // Lignes du carnet dans l'ordre chronologique ; les reports forment le « total des pages précédentes » de la page 1
+  // Lignes du carnet dans l'ordre chronologique (toutes les heures depuis le début)
   const flights = useMemo(
     () => entries.filter((e) => e.kind === "vol").sort((a, b) => (a.flight_date + t5(a.dep_time)).localeCompare(b.flight_date + t5(b.dep_time))),
     [entries],
   );
-  const reports = entries.filter((e) => e.kind === "report");
   // Avions déjà notés par le pilote hors flotte du club (proposés en plus des avions du club)
   const mine = useMemo(() => {
     const m = new Map<string, string>();
     for (const e of flights) if (e.aircraft_reg && !fleet.some((p) => p.registration === e.aircraft_reg)) m.set(e.aircraft_reg, e.aircraft_model ?? "");
     return [...m].map(([registration, model]) => ({ registration, model })).sort((a, b) => a.registration.localeCompare(b.registration));
   }, [flights, fleet]);
-  const carried = reports.reduce(add, zero());
   const pages = Math.max(1, Math.ceil((flights.length + 1) / PER_PAGE)); // + la ligne de saisie
   const [page, setPage] = useState(pages - 1);
   useEffect(() => setPage(pages - 1), [pages]);
 
   const rows = flights.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
-  const before = flights.slice(0, page * PER_PAGE).reduce(add, carried);
+  const before = flights.slice(0, page * PER_PAGE).reduce(add, zero());
   const pageTot = rows.reduce(add, zero());
   const lastPage = page === pages - 1;
 
@@ -63,19 +60,11 @@ export function CarnetClient({ entries, fleet, today }: { entries: LogEntry[]; f
   }
   const done = (m?: CarnetState) => {
     setEditing(null);
-    setReport(null);
     if (m) setMsg(m);
   };
 
   return (
     <section>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <h2 className="mr-auto text-lg font-bold text-navy-2">Mes vols</h2>
-        <button type="button" className="btn-secondary" onClick={() => { setMsg(undefined); setReport("new"); }}>
-          Reporter mes heures antérieures
-        </button>
-      </div>
-      {report && <ReportForm entry={report === "new" ? null : report} today={today} onClose={done} />}
       <div className="mb-3"><FormMessage state={msg} /></div>
 
       {/* Le carnet prend toute la largeur de l'écran : ses 25 colonnes restent lisibles */}
@@ -155,7 +144,7 @@ export function CarnetClient({ entries, fleet, today }: { entries: LogEntry[]; f
             </tbody>
             <tfoot className="text-[12px] font-semibold">
               <TotRow label="TOTAL DE LA PAGE" t={pageTot} />
-              <TotRow label="TOTAL DES PAGES PRÉCÉDENTES" t={before} muted note={page === 0 && reports.length ? "dont report des heures antérieures" : undefined} />
+              <TotRow label="TOTAL DES PAGES PRÉCÉDENTES" t={before} muted />
               <TotRow label="TOTAL" t={plus(before, pageTot)} strong />
             </tfoot>
           </table>
@@ -166,16 +155,6 @@ export function CarnetClient({ entries, fleet, today }: { entries: LogEntry[]; f
         </p>
       </div>
 
-      {reports.length > 0 && (
-        <div className="mt-3 text-sm text-muted">
-          Reports d&apos;heures antérieures :{" "}
-          {reports.map((r) => (
-            <button key={r.id} type="button" className="mr-3 text-sky hover:underline" onClick={() => setReport(r)}>
-              {frDate(r.flight_date)}{r.aircraft_model ? ` (${r.aircraft_model})` : ""} — {hm(r.total_min)}
-            </button>
-          ))}
-        </div>
-      )}
     </section>
   );
 }
@@ -390,64 +369,4 @@ function SaveButton({ formId, label }: { formId: string; label: string }) {
   );
 }
 
-function ReportForm({ entry, today, onClose }: { entry: LogEntry | null; today: string; onClose: (m?: CarnetState) => void }) {
-  const [state, action] = useActionState<CarnetState, FormData>(saveEntry, undefined);
-  useEffect(() => {
-    if (state?.ok) onClose(state);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
-  const [delPending, start] = useTransition();
-  const d = (m: number | undefined) => (entry && m ? hm(m) : "");
-  return (
-    <form onSubmit={keepValues(action)} className="card mb-4 space-y-3 p-5">
-      <input type="hidden" name="id" value={entry?.id ?? ""} />
-      <input type="hidden" name="kind" value="report" />
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="font-bold text-navy-2">{entry ? "Modifier le report" : "Reporter mes heures antérieures"}</h3>
-        <button type="button" className="text-sm text-muted hover:underline" onClick={() => onClose()}>Fermer</button>
-      </div>
-      <p className="text-sm text-muted">
-        Totaux de votre carnet papier à la date indiquée : ils s&apos;ajoutent au « total des pages précédentes » de la première page. Un
-        report par type d&apos;appareil est possible. Ils comptent dans vos totaux, pas dans l&apos;expérience récente.
-      </p>
-      <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <L label="Arrêté au"><input type="date" name="flight_date" required defaultValue={entry?.flight_date ?? today} className="field" /></L>
-        <L label="Type (facultatif)"><input name="aircraft_model" defaultValue={entry?.aircraft_model ?? ""} placeholder="tous types" className="field" maxLength={40} /></L>
-        <L label="Durée totale"><input name="total" required defaultValue={d(entry?.total_min)} placeholder="125:30" className="field" /></L>
-        <L label="CDB"><input name="pic" defaultValue={d(entry?.pic_min)} className="field" /></L>
-        <L label="DC"><input name="dual" defaultValue={d(entry?.dual_min)} className="field" /></L>
-        <L label="INST"><input name="instructor" defaultValue={d(entry?.instructor_min)} className="field" /></L>
-        <L label="COPI"><input name="copilot" defaultValue={d(entry?.copilot_min)} className="field" /></L>
-        <L label="Nuit"><input name="night" defaultValue={d(entry?.night_min)} className="field" /></L>
-        <L label="IFR"><input name="ifr" defaultValue={d(entry?.ifr_min)} className="field" /></L>
-        <L label="Atterrissages jour"><input name="landings_day" inputMode="numeric" defaultValue={entry?.landings_day || ""} className="field" /></L>
-        <L label="Atterrissages nuit"><input name="landings_night" inputMode="numeric" defaultValue={entry?.landings_night || ""} className="field" /></L>
-        <L label="Remarque"><input name="remarks" defaultValue={entry?.remarks ?? ""} placeholder="Carnet papier n°1" className="field" maxLength={500} /></L>
-      </div>
-      <FormMessage state={state?.error ? state : undefined} />
-      <div className="flex flex-wrap gap-2">
-        <SubmitButton pending="Enregistrement…">{entry ? "Enregistrer" : "Ajouter le report"}</SubmitButton>
-        <button type="button" className="btn-secondary" onClick={() => onClose()}>Annuler</button>
-        {entry && (
-          <button
-            type="button"
-            disabled={delPending}
-            className="ml-auto text-sm text-danger hover:underline"
-            onClick={() => window.confirm("Supprimer ce report ?") && start(async () => onClose(await deleteEntry(entry.id)))}
-          >
-            Supprimer ce report
-          </button>
-        )}
-      </div>
-    </form>
-  );
-}
 
-function L({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="label">{label}</span>
-      {children}
-    </label>
-  );
-}
