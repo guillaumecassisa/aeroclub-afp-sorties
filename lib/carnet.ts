@@ -148,9 +148,9 @@ export function computeRecap(entries: LogEntry[], sepExpiry: string | null, toda
   const w = sumWindow(entries, sepFrom, sepTo);
   const checks: Recap["sep"]["checks"] = [
     { label: "Heures de vol", done: w.total, need: 12 * 60, unit: "h" },
-    { label: "dont commandant de bord", done: w.pic, need: 6 * 60, unit: "h" },
+    { label: "dont CDB", done: w.pic, need: 6 * 60, unit: "h" },
     { label: "Décollages et atterrissages", done: w.landings, need: 12, unit: "n" },
-    { label: "Vol d'entraînement avec instructeur", done: w.dual, need: 60, unit: "h" },
+    { label: "Vol avec instructeur", done: w.dual, need: 60, unit: "h" },
   ];
 
   const types = new Map<string, Recap["byType"][number]>();
