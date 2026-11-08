@@ -9,7 +9,7 @@ et dans le gestionnaire de mots de passe de l'administrateur.
 | Service | Élément | Valeur |
 |---|---|---|
 | GitHub | Dépôt | `guillaumecassisa/aeroclub-afp-sorties` — branche `main` = site en ligne |
-| Vercel | Projet | `aeroclub-afpa` (équipe *perso13*), adresse `https://aeroclub-afp-sorties.vercel.app` |
+| Vercel | Projet | `aeroclub-afpa` (équipe *perso13*), adresse `https://membres.af-provenceaviation.fr` (CNAME `membres` dans la zone DNS OVH de af-provenceaviation.fr ; ancienne adresse `aeroclub-afp-sorties.vercel.app`) |
 | Supabase | Projet | `supabase-camel-ferry`, identifiant `hxapzevgenqnjswwgkum`, région Paris (eu-west-3), PostgreSQL 17 |
 | Supabase | Facturation | Projet créé depuis Vercel (intégration *Vercel Marketplace*) : il se gère aussi depuis Vercel → Storage |
 
