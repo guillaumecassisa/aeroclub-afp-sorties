@@ -87,7 +87,10 @@ export function compute(d: MbData, loads: number[], fuelL: number, tripL: number
       problems.push(`${s.label} : ${f1(v)} ${s.fuel ? "L" : "kg"} dépasse le maximum de ${s.max} ${s.fuel ? "L" : "kg"}.`);
   });
   if (d.fuel_capacity_l && fuelL > d.fuel_capacity_l) problems.push(`Carburant : ${f1(fuelL)} L dépasse la capacité de ${d.fuel_capacity_l} L.`);
-  if (tripL > fuelL) problems.push("Le délestage prévu dépasse le carburant embarqué.");
+  // Carburant embarqué : réservoir principal + réservoirs saisis par poste (ailes gauche / droite…)
+  const stationFuelL = d.stations.reduce((t, s, i) => t + (s.fuel ? loads[i] ?? 0 : 0), 0);
+  const totalFuelL = fuelL + stationFuelL;
+  if (tripL > totalFuelL) problems.push("Le délestage prévu dépasse le carburant embarqué.");
 
   const fa = Number(d.fuel_arm);
   const hasPrimaryTank = d.fuel_capacity_l != null && d.fuel_capacity_l > 0;
@@ -106,7 +109,7 @@ export function compute(d: MbData, loads: number[], fuelL: number, tripL: number
   const zfMass = Number(d.empty_mass) + payloadMass;
   const zfMoment = Number(d.empty_moment) + payloadMoment;
   const fuelKg = fuelL * d.fuel_density;
-  const tripKg = Math.min(tripL, fuelL) * d.fuel_density;
+  const tripKg = Math.min(tripL, totalFuelL) * d.fuel_density;
 
   // Bras du trip fuel : réservoir principal si défini, sinon bras moyen pondéré des réservoirs en station
   const tripArm = hasPrimaryTank

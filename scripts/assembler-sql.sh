@@ -55,6 +55,7 @@ migration-44-photos-vols.sql
 migration-45-carnet-de-vol.sql
 migration-46-carnet-simulateur.sql
 migration-47-carnet-licence.sql
+migration-48-reservoirs-ailes.sql
 "
 LAST=$(echo "$MIGRATIONS" | grep . | tail -1 | sed 's/migration-\([0-9]*\).*/\1/')
 

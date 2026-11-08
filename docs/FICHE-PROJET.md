@@ -91,3 +91,4 @@ Secrets GitHub (sauvegarde nocturne uniquement, jamais dans Vercel) : `SUPABASE_
 | 45 | Carnet de vol personnel (vols, report d'heures, échéance SEP) |
 | 46 | Carnet de vol : date des séances de simulateur |
 | 47 | Carnet de vol : licence (PPL / LAPL, numéro, délivrance, qualification de nuit) |
+| 48 | Masse et centrage : réservoirs d'aile gauche et droite (PS28, B23, DA40, DR400) |
