@@ -11,6 +11,12 @@ const SETUP_PAGE = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><
 <p style="color:#5f6b7d;line-height:1.5">La base de données du club n'est pas encore branchée. Revenez très bientôt.</p></div></body></html>`;
 
 export async function proxy(request: NextRequest) {
+  // Ancienne adresse du site : redirection permanente vers l'adresse du club (même page)
+  const site = process.env.NEXT_PUBLIC_SITE_URL;
+  if (site && request.headers.get("host") === "aeroclub-afp-sorties.vercel.app") {
+    const to = new URL(request.nextUrl.pathname + request.nextUrl.search, site);
+    if (to.host !== "aeroclub-afp-sorties.vercel.app") return NextResponse.redirect(to, 308);
+  }
   // Tant que Supabase n'est pas configuré, on affiche une page d'attente propre
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
