@@ -3,6 +3,9 @@ import type { Metadata } from "next";
 import { canManageDocs, canManageFleet, requireMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import type { Aircraft } from "@/lib/types";
+import type { MbData } from "@/lib/mb";
+import { wingTankChange } from "@/lib/mbTanks";
+import { WingTanksButton } from "./WingTanksButton";
 
 export const metadata: Metadata = { title: "Flotte" };
 
@@ -16,6 +19,17 @@ export default async function Page() {
   const counts = new Map<string, number>();
   for (const d of docs ?? []) counts.set(d.aircraft_id as string, (counts.get(d.aircraft_id as string) ?? 0) + 1);
   const aircraft = (fleet ?? []) as Aircraft[];
+  // Mise à jour n°48 (réservoirs d'aile) à appliquer : bouton proposé aux gestionnaires de la flotte
+  let toConvert: string[] = [];
+  if (canManageFleet(me)) {
+    const { data: mbs } = await supabase.from("aircraft_mb").select("aircraft_id, stations, fuel_capacity_l, fuel_arm");
+    toConvert = aircraft
+      .filter((a) => {
+        const mb = (mbs ?? []).find((m) => m.aircraft_id === a.id);
+        return mb && wingTankChange(a.type, mb as unknown as MbData);
+      })
+      .map((a) => a.registration);
+  }
 
   return (
     <>
@@ -37,6 +51,8 @@ export default async function Page() {
           )}
         </div>
       </div>
+
+      {toConvert.length > 0 && <WingTanksButton planes={toConvert} />}
 
       {aircraft.length === 0 ? (
         <div className="card p-8 text-center text-muted">Aucun avion enregistré.</div>

@@ -3,7 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { DOC_BUCKET, DOC_CATEGORIES } from "@/lib/docs";
-import { canManageDocs, requireMember } from "@/lib/auth";
+import { canManageDocs, canManageFleet, requireMember } from "@/lib/auth";
+import { wingTankChange } from "@/lib/mbTanks";
+import type { MbData } from "@/lib/mb";
 
 async function docManager() {
   return canManageDocs(await requireMember());
@@ -72,4 +74,27 @@ export async function restoreDocument(id: string, aircraftId: string): Promise<v
   if (error) { console.error("[restoreDocument]", error.message); return; }
   revalidatePath(`/flotte/${aircraftId}`);
   revalidatePath("/flotte");
+}
+
+/** Masse et centrage : réservoirs d'aile gauche et droite sur les avions concernés (mise à jour n°48) */
+export async function convertWingTanks(): Promise<{ ok?: string; error?: string }> {
+  if (!canManageFleet(await requireMember())) return { error: "Réservé aux administrateurs et responsables maintenance." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("aircraft_mb").select("aircraft_id, stations, fuel_capacity_l, fuel_arm, aircraft:aircraft_id (registration, type)");
+  if (error) return { error: "Lecture impossible : " + error.message };
+  const done: string[] = [];
+  for (const row of data ?? []) {
+    const ac = row.aircraft as unknown as { registration: string; type: string } | null;
+    const change = ac ? wingTankChange(ac.type, row as unknown as MbData) : null;
+    if (!change) continue;
+    const { error: e } = await supabase
+      .from("aircraft_mb")
+      .update({ ...change, updated_at: new Date().toISOString() })
+      .eq("aircraft_id", row.aircraft_id);
+    if (e) return { error: `${ac!.registration} : ${e.message}` };
+    done.push(ac!.registration);
+  }
+  revalidatePath("/flotte");
+  revalidatePath("/centrage");
+  return { ok: done.length ? `Réservoirs gauche / droite en place sur ${done.join(", ")}.` : "Rien à mettre à jour : c'était déjà fait." };
 }
