@@ -343,7 +343,7 @@ export default async function Page({
             { href: "/bar", icon: "🍺", label: "Espace Bar", sub: "Consommations & solde" },
             { href: "/sorties", icon: "📅", label: "Événements", sub: "Sorties, activités & inscriptions" },
             { href: "/annuaire", icon: "👤", label: "Annuaire", sub: "Trombinoscope & contacts" },
-            { href: "/bons-plans", icon: "💡", label: "Bons plans", sub: "Réductions & avantages" },
+            { href: "/bons-plans", icon: "💡", label: "Bons plans", sub: "Infos terrains" },
             { href: "/shop", icon: "🛍️", label: "Le shop", sub: "Vêtements & accessoires" },
             { href: "/preparer-son-vol", icon: "🗺️", label: "Préparer son vol", sub: "Météo, NOTAM, outils" },
             { href: "/flotte", icon: "✈️", label: "Flotte", sub: "Avions & disponibilités" },
