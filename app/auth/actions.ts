@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import type { FormState } from "@/lib/types";
+import { notifyNewSignup } from "@/lib/email";
 
 async function siteUrl() {
   if (process.env.NEXT_PUBLIC_SITE_URL) return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
@@ -70,6 +71,8 @@ export async function signup(_: FormState, formData: FormData): Promise<FormStat
     },
   });
   if (error) return { error: translate(error.message) };
+  // Un compte « déjà inscrit » renvoie un utilisateur sans identité : pas de notification dans ce cas
+  if (data.user?.identities?.length) await notifyNewSignup(full_name, email);
   if (data.session) redirect("/en-attente"); // confirmation email désactivée côté Supabase
   return {
     ok: "Compte créé ! Cliquez sur le lien reçu par email pour confirmer votre adresse. Un administrateur du club validera ensuite votre compte.",

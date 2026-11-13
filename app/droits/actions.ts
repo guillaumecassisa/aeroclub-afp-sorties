@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "@/lib/auth";
 import type { Role } from "@/lib/types";
+import { notifyMemberApproved } from "@/lib/email";
 
 const ROLES: Role[] = ["pending", "member", "instructor", "admin"];
 
@@ -13,9 +14,12 @@ export async function setRole(userId: string, formData: FormData) {
   const role = String(formData.get("role")) as Role;
   if (!ROLES.includes(role)) return;
   const supabase = await createClient();
+  const { data: before } = await supabase.from("profiles").select("role, email, full_name").eq("id", userId).maybeSingle();
   const { error } = await supabase.rpc("set_user_role", { p_user: userId, p_role: role });
   revalidatePath("/droits");
   if (error) redirect(`/droits?erreur=${encodeURIComponent(error.message)}`);
+  // Compte qui sort de l'attente : le membre reçoit un email de bienvenue
+  if (before?.role === "pending" && role !== "pending" && before.email) await notifyMemberApproved(before.email, before.full_name);
   redirect(`/droits?ok=${encodeURIComponent("Compte validé.")}`);
 }
 

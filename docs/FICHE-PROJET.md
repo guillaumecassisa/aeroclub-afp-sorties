@@ -54,7 +54,8 @@ Modèle complet commenté : `.env.example`.
 | `NEXT_PUBLIC_HOME_ICAO`, `NEXT_PUBLIC_HOME_AIRFIELD` | oui | Terrain de base |
 | `QNH_STATIONS`, `TAF_STATIONS`, `NOTAM_LOCATIONS` | oui | Stations météo et NOTAM |
 | `SMTP_USER`, `SMTP_PASS`, `SMTP_HOST`, `SMTP_PORT` ou `RESEND_API_KEY` | non | Envoi des emails |
-| `EMAIL_FROM` | non | Expéditeur des emails |
+| `EMAIL_FROM` | non | Expéditeur des emails (ex. `Aéroclub AFPA <nepasrepondre@af-provenceaviation.fr>`, domaine vérifié chez Resend) |
+| `ADMIN_NOTIFY_EMAIL` | non | Adresse prévenue à chaque nouvelle inscription à valider |
 
 Secrets GitHub (sauvegarde nocturne uniquement, jamais dans Vercel) : `SUPABASE_DB_URL`,
 `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKUP_PASSPHRASE`.

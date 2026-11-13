@@ -266,3 +266,45 @@ export async function notifyRexSubmitted(
       })),
   );
 }
+
+/** Compte validé par un administrateur : le membre est prévenu */
+export async function notifyMemberApproved(to: string, fullName: string | null) {
+  const prenom = (fullName ?? "").trim().split(/\s+/)[0] || "";
+  await sendAll([
+    {
+      to,
+      subject: `✈️ Votre compte ${CLUB_NAME} est validé`,
+      text: [
+        `Bonjour${prenom ? ` ${prenom}` : ""},`,
+        "",
+        `Bonne nouvelle : votre compte sur l'espace membres de l'${CLUB_NAME} vient d'être validé.`,
+        "Vous avez maintenant accès à tout le site : sorties et événements, flotte, préparation des vols, carnet de vol, bar, shop…",
+        "",
+        `Connectez-vous : ${SITE_URL ? `${SITE_URL}/connexion` : "sur l'espace membres du club"}`,
+        "",
+        "Bons vols !",
+        CLUB_NAME,
+      ].join("\n"),
+    },
+  ]);
+}
+
+/** Nouvelle inscription en attente : l'adresse ADMIN_NOTIFY_EMAIL est prévenue (si elle est renseignée) */
+export async function notifyNewSignup(fullName: string, email: string) {
+  const to = process.env.ADMIN_NOTIFY_EMAIL?.trim();
+  if (!to) return;
+  await sendAll([
+    {
+      to,
+      subject: `Nouvelle inscription à valider : ${fullName}`,
+      text: [
+        `${fullName} (${email}) vient de créer un compte sur l'espace membres.`,
+        "Le compte est en attente : il sera actif dès qu'un administrateur l'aura validé.",
+        "",
+        `Valider : ${SITE_URL ? `${SITE_URL}/droits` : "Gestion → Membres et droits"}`,
+        "",
+        "(Si l'adresse email n'a pas encore été confirmée par le membre, attendez qu'il clique sur le lien reçu.)",
+      ].join("\n"),
+    },
+  ]);
+}
