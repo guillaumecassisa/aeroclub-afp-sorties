@@ -16,7 +16,7 @@ const tanks = (arm: number, max: number): Station[] => [
 
 export function wingTankChange(type: string, d: Row): TankChange | null {
   const st = d.stations ?? [];
-  if (JSON.stringify(st).toLowerCase().includes("aile gauche")) return null; // déjà converti
+  if (st.some((s) => s.fuel && /aile gauche/i.test(s.label))) return null; // déjà converti (réservoir, pas casier)
   const t = type.toUpperCase();
   if (t === "PS28" || t === "B23" || t === "DA40") {
     const fuelSt = st.filter((s) => s.fuel);

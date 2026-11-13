@@ -21,7 +21,7 @@ begin
     from public.aircraft_mb m join public.aircraft a on a.id = m.aircraft_id
   loop
     -- déjà converti
-    if r.stations::text ilike '%aile gauche%' then continue; end if;
+    if r.stations::text ilike '%réservoir aile gauche%' then continue; end if;
 
     if r.type in ('PS28', 'B23', 'DA40') then
       -- capacité totale : réservoir principal, sinon poste carburant existant
