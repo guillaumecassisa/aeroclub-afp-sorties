@@ -55,7 +55,7 @@ function PublishBanner({ onPublished, clubAircraft }: { onPublished?: () => void
       {/* Barre de déclenchement */}
       {!open && (
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
-          <span className="text-sm text-muted">Vous partez en navigation et souhaitez emmener des passagers ?</span>
+          <span className="text-sm font-semibold text-navy-2">Le vol partagé des pilotes pour les pilotes !</span>
           <button type="button" onClick={() => setOpen(true)} className="btn-primary ml-auto shrink-0">
             ✈️ Proposer un vol
           </button>
