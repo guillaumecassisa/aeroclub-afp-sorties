@@ -118,6 +118,61 @@ export function RecapBand({ r, licenceForm }: { r: Recap; licenceForm: React.Rea
         )}
       </div>
 
+      {/* Statistiques : terrains et appareils différents */}
+      <div className="grid gap-3 border-t border-line px-5 py-3 lg:grid-cols-2">
+        <div className="min-w-0">
+          <p className="flex flex-wrap items-baseline gap-x-2 text-[11px] font-bold tracking-wide text-muted uppercase">
+            Terrains visités
+            <span className="text-2xl font-bold tracking-normal text-navy-2">{r.stats.airfields.length}</span>
+            <span className="text-xs font-normal tracking-normal text-muted normal-case">
+              terrain{r.stats.airfields.length > 1 ? "s" : ""} différent{r.stats.airfields.length > 1 ? "s" : ""} (départ ou arrivée)
+            </span>
+          </p>
+          {r.stats.airfields.length > 0 ? (
+            <ul className="mt-1.5 flex flex-wrap gap-1.5">
+              {r.stats.airfields.map((f) => (
+                <li
+                  key={f.code}
+                  title={`${f.visits} vol${f.visits > 1 ? "s" : ""} · dernier le ${frDate(f.last)}`}
+                  className="rounded-full border border-line bg-paper px-2.5 py-0.5 text-xs font-semibold text-ink"
+                >
+                  {f.code} <span className="font-normal text-muted">×{f.visits}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-xs text-muted">Renseignez les lieux de départ et d&apos;arrivée de vos vols.</p>
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="flex flex-wrap items-baseline gap-x-2 text-[11px] font-bold tracking-wide text-muted uppercase">
+            Appareils pilotés
+            <span className="text-2xl font-bold tracking-normal text-navy-2">{r.stats.aircraft.length}</span>
+            <span className="text-xs font-normal tracking-normal text-muted normal-case">
+              immatriculation{r.stats.aircraft.length > 1 ? "s" : ""} différente{r.stats.aircraft.length > 1 ? "s" : ""} · {r.stats.types} type
+              {r.stats.types > 1 ? "s" : ""}
+            </span>
+          </p>
+          {r.stats.aircraft.length > 0 ? (
+            <ul className="mt-1.5 flex flex-wrap gap-1.5">
+              {r.stats.aircraft.map((a) => (
+                <li
+                  key={a.reg}
+                  title={`${a.flights} vol${a.flights > 1 ? "s" : ""} · dernier le ${frDate(a.last)}`}
+                  className="rounded-full border border-line bg-paper px-2.5 py-0.5 text-xs font-semibold text-ink"
+                >
+                  {a.reg}
+                  {a.model && <span className="font-normal text-muted"> {a.model}</span>}
+                  <span className="font-normal text-muted"> · {hm(a.total)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-xs text-muted">Renseignez l&apos;immatriculation de vos vols.</p>
+          )}
+        </div>
+      </div>
+
       {/* Par type d'appareil */}
       {r.byType.length > 0 && (
         <div className="border-t border-line px-5 py-2.5">

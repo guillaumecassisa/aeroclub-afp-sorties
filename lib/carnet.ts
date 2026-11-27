@@ -130,6 +130,12 @@ export type Recap = {
   /** Vol de nuit : qualification (FCL.810, sans date d'échéance) et emport de passagers de nuit (FCL.060 b 1 ii) */
   night: { rating: boolean; total: number; landings90: number; landingsTotal: number; passengersOk: boolean; validUntil: string | null };
   byType: { model: string; total: number; pic: number; landings: number; last: string | null; last90: number }[];
+  /** Statistiques : terrains différents (départ ou arrivée) et appareils différents (immatriculations) */
+  stats: {
+    airfields: { code: string; visits: number; last: string }[];
+    aircraft: { reg: string; model: string | null; total: number; flights: number; last: string }[];
+    types: number;
+  };
   lastFlight: string | null;
 };
 
@@ -214,9 +220,42 @@ export function computeRecap(entries: LogEntry[], licence: LicenceSettings, toda
     types.set(model, t);
   }
 
+  // Statistiques : terrains et appareils différents (lignes de vol uniquement)
+  const fields = new Map<string, { code: string; visits: number; last: string }>();
+  const planes = new Map<string, { reg: string; model: string | null; total: number; flights: number; last: string }>();
+  const models = new Set<string>();
+  for (const e of entries) {
+    if (e.kind !== "vol") continue;
+    const codes = new Set([e.dep_place, e.arr_place].map((c) => (c ?? "").trim().toUpperCase()).filter(Boolean));
+    for (const code of codes) {
+      const f = fields.get(code) ?? { code, visits: 0, last: e.flight_date };
+      f.visits += 1;
+      if (e.flight_date > f.last) f.last = e.flight_date;
+      fields.set(code, f);
+    }
+    const reg = (e.aircraft_reg ?? "").trim().toUpperCase();
+    if (reg) {
+      const a = planes.get(reg) ?? { reg, model: e.aircraft_model, total: 0, flights: 0, last: e.flight_date };
+      a.total += e.total_min;
+      a.flights += 1;
+      if (e.flight_date >= a.last) {
+        a.last = e.flight_date;
+        a.model = e.aircraft_model || a.model;
+      }
+      planes.set(reg, a);
+    }
+    const model = (e.aircraft_model ?? "").trim().toUpperCase();
+    if (model) models.add(model);
+  }
+
   return {
     today,
     licence,
+    stats: {
+      airfields: [...fields.values()].sort((a, b) => b.visits - a.visits || a.code.localeCompare(b.code)),
+      aircraft: [...planes.values()].sort((a, b) => b.total - a.total || a.reg.localeCompare(b.reg)),
+      types: models.size,
+    },
     lapl: { window: lw, checks: lChecks, ok: lOk, validUntil: lValid, picSinceIssue },
     night: {
       rating: licence.night_rating,

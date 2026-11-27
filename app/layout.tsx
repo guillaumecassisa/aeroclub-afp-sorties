@@ -64,7 +64,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                     <path d="M9 7.5h6M9 11h6" />
                     <path d="m12.5 14.6 2.4-1 .4-1.6.7.3-.1 1.6 1.6.7-.2.6-1.7-.3-1.3 1.3-.6-.3.6-1.4" strokeWidth="1.2" />
                   </svg>
-                  <span className="hidden lg:inline">Carnet de vol</span>
+                  <span className="hidden md:inline">Mon Carnet de vol</span>
                 </Link>
               )}
               {approved && (
