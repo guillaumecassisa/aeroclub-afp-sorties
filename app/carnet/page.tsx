@@ -30,11 +30,16 @@ export default async function Page() {
             Vos vols et votre expérience récente pour garder les privilèges de votre licence. Carnet personnel : vous seul y avez accès.
           </p>
         </div>
-        {entries.length > 0 && (
-          <a href="/carnet/export" className="btn-secondary">
-            Exporter (Excel)
+        <div className="flex flex-wrap gap-2">
+          <a href="/carnet/import" className="btn-secondary">
+            📥 Importer mes vols (Aerogest)
           </a>
-        )}
+          {entries.length > 0 && (
+            <a href="/carnet/export" className="btn-secondary">
+              Exporter (Excel)
+            </a>
+          )}
+        </div>
       </div>
 
       <RecapBand r={r} licenceForm={<LicenceForm licence={licence} />} />

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireMember } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { blockMinutes, parseDuration } from "@/lib/carnet";
+import { dupKey, type ImportRow } from "@/lib/carnetImport";
 
 export type CarnetState = { ok?: string; error?: string; savedId?: string } | undefined;
 
@@ -136,4 +137,75 @@ export async function saveLicence(_: CarnetState, fd: FormData): Promise<CarnetS
   if (error) return { error: "Enregistrement impossible : " + error.message };
   revalidatePath("/carnet");
   return { ok: "Licence enregistrée." };
+}
+
+/** Import en lot (CSV Aerogest ou tableur) : lignes déjà converties côté navigateur, revalidées ici, doublons ignorés */
+export async function importEntries(json: string): Promise<CarnetState & { inserted?: number; skipped?: number }> {
+  await requireMember();
+  let input: ImportRow[];
+  try {
+    input = JSON.parse(json);
+  } catch {
+    return { error: "Données d'import illisibles." };
+  }
+  if (!Array.isArray(input) || !input.length) return { error: "Aucun vol à importer." };
+  if (input.length > 5000) return { error: "5 000 vols maximum par import." };
+
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const s = (v: unknown, n: number) => (typeof v === "string" && v.trim() ? v.trim().slice(0, n) : null);
+  const n = (v: unknown, max = 600000) => Math.max(0, Math.min(max, Math.round(Number(v) || 0)));
+  const t = (v: unknown) => (typeof v === "string" && /^\d{2}:\d{2}$/.test(v) ? v : null);
+
+  const supabase = await createClient();
+  const { data: existing } = await supabase.from("logbook_entries").select("flight_date, aircraft_reg, dep_time, total_min");
+  const seen = new Set((existing ?? []).map((e) => dupKey(e as Parameters<typeof dupKey>[0])));
+
+  const rows: Record<string, unknown>[] = [];
+  let skipped = 0;
+  for (const r of input) {
+    if (typeof r?.flight_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(r.flight_date) || r.flight_date > tomorrow) {
+      skipped++;
+      continue;
+    }
+    const total = n(r.total_min);
+    if (!total) {
+      skipped++;
+      continue;
+    }
+    const row = {
+      kind: "vol",
+      flight_date: r.flight_date,
+      dep_place: s(r.dep_place, 40)?.toUpperCase() ?? null,
+      dep_time: t(r.dep_time),
+      arr_place: s(r.arr_place, 40)?.toUpperCase() ?? null,
+      arr_time: t(r.arr_time),
+      aircraft_model: s(r.aircraft_model, 40),
+      aircraft_reg: s(r.aircraft_reg, 20)?.toUpperCase() ?? null,
+      se_min: total,
+      total_min: total,
+      pic_name: s(r.pic_name, 80),
+      landings_day: n(r.landings_day, 999),
+      landings_night: n(r.landings_night, 999),
+      night_min: Math.min(total, n(r.night_min)),
+      ifr_min: Math.min(total, n(r.ifr_min)),
+      pic_min: Math.min(total, n(r.pic_min)),
+      dual_min: Math.min(total, n(r.dual_min)),
+      instructor_min: Math.min(total, n(r.instructor_min)),
+      remarks: s(r.remarks, 500),
+    };
+    const key = dupKey(row);
+    if (seen.has(key)) {
+      skipped++;
+      continue;
+    }
+    seen.add(key);
+    rows.push(row);
+  }
+
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await supabase.from("logbook_entries").insert(rows.slice(i, i + 500));
+    if (error) return { error: `Import interrompu après ${i} vols : ${error.message}`, inserted: i, skipped };
+  }
+  revalidatePath("/carnet");
+  return { ok: `${rows.length} vol${rows.length > 1 ? "s" : ""} importé${rows.length > 1 ? "s" : ""}.`, inserted: rows.length, skipped };
 }
