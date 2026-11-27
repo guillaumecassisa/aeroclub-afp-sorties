@@ -10,7 +10,11 @@ export const metadata: Metadata = { title: "Importer mes vols" };
 export default async function Page() {
   await requireMember();
   const supabase = await createClient();
-  const { data } = await supabase.from("logbook_entries").select("flight_date, aircraft_reg, dep_time, total_min");
+  const [{ data }, { data: fleet }] = await Promise.all([
+    supabase.from("logbook_entries").select("flight_date, aircraft_reg, dep_time, total_min"),
+    supabase.from("aircraft").select("registration, model"),
+  ]);
+  const models = Object.fromEntries((fleet ?? []).map((a) => [String(a.registration).toUpperCase(), String(a.model ?? "")]));
   const existing = (data ?? []).map((e) => dupKey(e as Parameters<typeof dupKey>[0]));
 
   return (
@@ -25,7 +29,7 @@ export default async function Page() {
           l&apos;aperçu avant l&apos;import ; les vols déjà présents dans votre carnet sont ignorés.
         </p>
       </div>
-      <ImportClient existing={existing} />
+      <ImportClient existing={existing} models={models} />
     </>
   );
 }

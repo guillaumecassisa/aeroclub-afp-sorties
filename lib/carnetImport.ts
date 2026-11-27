@@ -23,6 +23,8 @@ export type ImportField =
   | "pic"
   | "dual"
   | "instructor"
+  | "instructor_name"
+  | "conditions"
   | "remarks";
 
 export const IMPORT_FIELDS: { value: ImportField; label: string }[] = [
@@ -43,24 +45,28 @@ export const IMPORT_FIELDS: { value: ImportField; label: string }[] = [
   { value: "pic", label: "Temps CDB" },
   { value: "dual", label: "Temps double commande" },
   { value: "instructor", label: "Temps instructeur" },
-  { value: "remarks", label: "Remarques / nature du vol" },
+  { value: "instructor_name", label: "Nom / code de l'instructeur" },
+  { value: "conditions", label: "Conditions (VFR jour, nuit, IFR)" },
+  { value: "remarks", label: "Remarques / commentaire" },
 ];
 
 /** Synonymes d'en-têtes (minuscules, sans accents ni ponctuation), du plus précis au plus large */
 const SYNONYMS: [ImportField, RegExp][] = [
   ["landings_night", /^(nb |nombre )?(atterrissages?|att|aterrissages?|ldg|landings?) (de )?nuit$|^att nuit$/],
   ["night", /^(temps|duree|heures?|hdv) (de )?nuit$|^nuit$|^vol de nuit$/],
-  ["dep_time", /^(heure|h|hr) (de )?(depart|decollage|dep)$|^(bloc|block|cale) off$|^off ?block$|^depart heure$|^heure debut$|^debut$|^decollage$/],
-  ["arr_time", /^(heure|h|hr) (d )?(arrivee|atterrissage|arr)$|^(bloc|block|cale) on$|^on ?block$|^arrivee heure$|^heure fin$|^fin$/],
+  ["dep_time", /^depart utc$|^depart heure utc$|^(heure|h|hr) (de )?(depart|decollage|dep)$|^(bloc|block|cale) off$|^off ?block$|^depart heure$|^heure debut$|^debut$|^decollage$/],
+  ["arr_time", /^arrivee utc$|^arrivee heure utc$|^(heure|h|hr) (d )?(arrivee|atterrissage|arr)$|^(bloc|block|cale) on$|^on ?block$|^arrivee heure$|^heure fin$|^fin$/],
   ["dep_place", /^(lieu|terrain|aerodrome|ad|oaci) (de )?(depart|dep)$|^depart( lieu)?$|^de$|^from$|^origine$|^provenance$|^terrain$/],
   ["arr_place", /^(lieu|terrain|aerodrome|ad|oaci) (d )?(arrivee|arr|destination)$|^arrivee( lieu)?$|^a$|^to$|^destination$/],
   ["aircraft_reg", /^immat(riculation)?s?$|^(immat|immatriculation) (avion|appareil)$|^registration$|^reg$|^indicatif$/],
   ["aircraft_model", /^(type|modele)( (d )?(avion|appareil|aeronef|machine))?$|^aeronef$|^appareil$|^avion$|^machine$/],
-  ["instructor", /^(temps |heures? |duree )?instructeur$|^inst$|^fi$/],
+  ["instructor", /^(temps|heures?|duree) (d )?instructeur$|^temps inst$/],
+  ["instructor_name", /^(nom (de l )?|code )?instructeur$|^fi$|^inst$/],
+  ["conditions", /^nature( du vol)?$|^conditions?( de vol)?$|^regles?( de vol)?$|^vfr ifr$/],
   ["dual", /^(temps |heures? |duree )?(en )?(double( commande)?|dc|instruction|eleve)$/],
   ["pic", /^(temps |heures? |duree )(cdb|commandant de bord|pic)$|^pic$/],
   ["pic_name", /^(nom (du )?)?(commandant de bord|cdb)$|^(nom )?pilote$|^pilote cdb$/],
-  ["function", /^fonction( a bord)?$|^qualite$|^role$|^type de vol$|^nature( du vol)?$|^categorie$/],
+  ["function", /^fonction( a bord)?$|^mode$|^qualite$|^role$|^type de vol$|^categorie$/],
   ["ifr", /^(temps |duree )?ifr$/],
   ["landings_day", /^(nb |nombre (d )?)?(atterrissages?|att|aterrissages?|atterro|ldg|landings?)( jour)?$|^atterrissages? de jour$/],
   ["total", /^(duree|temps)( (de )?vol| totale?| bloc| reel)?$|^total( vol)?$|^(heures?|hdv)( de vol)?$|^tdv$/],
@@ -143,9 +149,15 @@ export function guessMapping(rows: string[][]): { headerRow: number; mapping: (I
     const vals = data.map((r) => r[i] ?? "").filter(Boolean);
     if (vals.length && vals.filter(looksReg).length / vals.length > 0.6) {
       best.mapping[i] = "aircraft_reg";
-      const typeCol = rows[best.headerRow].findIndex((c, j) => !best.mapping[j] && /^(type|modele)\b/.test(norm(c)));
+      const typeCol = rows[best.headerRow].findIndex((c, j) => !best.mapping[j] && /^(type|modele)( (d )?(avion|appareil|aeronef))?$/.test(norm(c)));
       if (typeCol >= 0) best.mapping[typeCol] = "aircraft_model";
     }
+  });
+  // Colonne « Type » qui contient le genre de vol (Local, Navigation) et non le type d'avion
+  best.mapping.forEach((f, i) => {
+    if (f !== "aircraft_model") return;
+    const vals = data.map((r) => norm(r[i] ?? "")).filter(Boolean);
+    if (vals.length && vals.filter((v) => /^(local|navigation|nav|tour|voyage|vol local|baptem|instruction)/.test(v)).length / vals.length > 0.5) best.mapping[i] = "";
   });
   return { headerRow: best.headerRow, mapping: best.mapping };
 }
@@ -186,6 +198,14 @@ export function parseDur(v: string): number | null {
   const m = s.match(/^(\d{1,5}):(\d{2}):(\d{2})$/);
   if (m) return +m[1] * 60 + +m[2] + (+m[3] >= 30 ? 1 : 0);
   return parseDuration(s);
+}
+
+/** « LFMA - Aix les Milles » -> « LFMA » ; sinon le texte tel quel */
+export function parsePlace(v: string): string | null {
+  const s = v.trim().toUpperCase();
+  if (!s) return null;
+  const m = s.match(/^([A-Z]{2}[A-Z0-9]{2})\s*[-–—:(]/) ?? s.match(/^([A-Z]{2}[A-Z0-9]{2})$/);
+  return (m ? m[1] : s).slice(0, 40);
 }
 
 export type Fn = "cdb" | "dc" | "inst";
@@ -248,12 +268,21 @@ export function buildRows(rows: string[][], headerRow: number, mapping: (ImportF
     const dur = (f: ImportField) => Math.min(total!, parseDur(get(f)) ?? 0);
 
     let pic = dur("pic"), dual = dur("dual"), inst = dur("instructor");
+    let fn: Fn = pic ? "cdb" : dual ? "dc" : inst ? "inst" : "cdb";
     if (!pic && !dual && !inst) {
-      const fn = parseFunction(get("function")) ?? defaultFn;
+      fn = parseFunction(get("function")) ?? defaultFn;
       if (fn === "inst") pic = inst = total;
       else if (fn === "dc") dual = total;
       else pic = total;
     }
+    // En double commande, le commandant de bord est l'instructeur
+    const instructorName = cut(get("instructor_name"), 80);
+    const picName = fn === "dc" && instructorName ? instructorName : cut(get("pic_name"), 80);
+    // Conditions : vol de nuit ou IFR sur toute la durée
+    const cond = norm(get("conditions"));
+    const night = /nuit|night/.test(cond);
+    const ifr = /\bifr\b/.test(cond);
+    const landings = col("landings_day") >= 0 ? num("landings_day") : 1;
 
     let model = cut(get("aircraft_model"), 40);
     let reg = cut(get("aircraft_reg"), 20)?.toUpperCase().replace(/^F([A-Z]{4})$/, "F-$1") ?? null;
@@ -262,18 +291,18 @@ export function buildRows(rows: string[][], headerRow: number, mapping: (ImportF
     out.push({
       line,
       flight_date: date,
-      dep_place: cut(get("dep_place"), 40)?.toUpperCase() ?? null,
+      dep_place: parsePlace(get("dep_place")),
       dep_time,
-      arr_place: cut(get("arr_place"), 40)?.toUpperCase() ?? null,
+      arr_place: parsePlace(get("arr_place")),
       arr_time,
       aircraft_model: model,
       aircraft_reg: reg,
       total_min: total,
-      landings_day: col("landings_day") >= 0 ? num("landings_day") : 1,
-      landings_night: num("landings_night"),
-      night_min: dur("night"),
-      ifr_min: dur("ifr"),
-      pic_name: cut(get("pic_name"), 80),
+      landings_day: night && col("landings_night") < 0 ? 0 : landings,
+      landings_night: night && col("landings_night") < 0 ? landings : num("landings_night"),
+      night_min: night && col("night") < 0 ? total : dur("night"),
+      ifr_min: ifr && col("ifr") < 0 ? total : dur("ifr"),
+      pic_name: picName,
       pic_min: pic,
       dual_min: dual,
       instructor_min: inst,

@@ -17,7 +17,7 @@ import { importEntries } from "../actions";
 
 const frDate = (d: string) => new Date(d + "T12:00:00Z").toLocaleDateString("fr-FR", { timeZone: "UTC" });
 
-export function ImportClient({ existing }: { existing: string[] }) {
+export function ImportClient({ existing, models }: { existing: string[]; models: Record<string, string> }) {
   const router = useRouter();
   const [fileName, setFileName] = useState("");
   const [rows, setRows] = useState<string[][]>([]);
@@ -46,7 +46,12 @@ export function ImportClient({ existing }: { existing: string[] }) {
 
   const width = useMemo(() => Math.max(0, ...rows.map((r) => r.length)), [rows]);
   const header = rows[headerRow] ?? [];
-  const result = useMemo(() => (rows.length ? buildRows(rows, headerRow, mapping, defaultFn) : { rows: [], errors: [] }), [rows, headerRow, mapping, defaultFn]);
+  const result = useMemo(() => {
+    const r = rows.length ? buildRows(rows, headerRow, mapping, defaultFn) : { rows: [], errors: [] };
+    // Type d'appareil absent de l'export : repris de la flotte du club d'après l'immatriculation
+    for (const x of r.rows) if (!x.aircraft_model && x.aircraft_reg && models[x.aircraft_reg]) x.aircraft_model = models[x.aircraft_reg].slice(0, 40);
+    return r;
+  }, [rows, headerRow, mapping, defaultFn, models]);
   const seen = useMemo(() => new Set(existing), [existing]);
   const fresh = useMemo(() => {
     const s = new Set(seen);
